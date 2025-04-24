@@ -2,7 +2,7 @@
 require 'bundler/setup'
 require "aws-sdk-dynamodb"
 
-def handler(event:, context:)
+def lambda_handler(event:, context:)
   data = client.scan(table_name: ENV["RUBY_LAMBDA_TABLE"])
   items = data.items
 

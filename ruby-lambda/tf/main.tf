@@ -118,7 +118,7 @@ resource "aws_lambda_function" "get_all_items_function" {
   function_name = "GetAllItemsFunction"
   role          = aws_iam_role.lambda_exec.arn
   # handler       = "../web/handlers/get_all_items.handler"
-  handler     = "get_all_items.handler"
+  handler     = "get_all_items.lambda_handler"
   runtime     = var.runtime
   memory_size = var.memory_size
   timeout     = 3
@@ -156,7 +156,7 @@ resource "aws_lambda_function" "create_item_function" {
   function_name = "CreateItemFunction"
   role          = aws_iam_role.lambda_exec.arn
   # handler       = "../web/handlers/create_item.handler"
-  handler     = "create_item.handler"
+  handler     = "create_item.lambda_handler"
   runtime     = var.runtime
   memory_size = var.memory_size
   timeout     = 3
@@ -209,7 +209,7 @@ resource "aws_lambda_function" "get_item_by_id_function" {
   function_name = "GetItemByIdFunction"
   role          = aws_iam_role.lambda_exec.arn
   # handler       = "../web/handlers/get_item_by_id.handler"
-  handler     = "get_item_by_id.handler"
+  handler     = "get_item_by_id.lambda_handler"
   runtime     = var.runtime
   memory_size = var.memory_size
   timeout     = 3
@@ -262,7 +262,7 @@ resource "aws_lambda_function" "delete_item_function" {
   function_name = "DeleteItemFunction"
   role          = aws_iam_role.lambda_exec.arn
   # handler       = "../web/handlers/delete_item.handler"
-  handler     = "delete_item.handler"
+  handler     = "delete_item.lambda_handler"
   runtime     = var.runtime
   memory_size = var.memory_size
   timeout     = 3
@@ -315,7 +315,7 @@ resource "aws_lambda_function" "update_item_function" {
   function_name = "UpdateItemFunction"
   role          = aws_iam_role.lambda_exec.arn
   # handler       = "../web/handlers/update_item.handler"
-  handler     = "update_item.handler"
+  handler     = "update_item.lambda_handler"
   runtime     = var.runtime
   memory_size = var.memory_size
   timeout     = 3

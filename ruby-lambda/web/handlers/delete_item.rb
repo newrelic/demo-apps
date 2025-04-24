@@ -4,7 +4,7 @@ require "aws-sdk-dynamodb"
 
 class ItemNotFoundError < StandardError; end
 
-def handler(event:, context:)
+def lambda_handler(event:, context:)
   id = event["pathParameters"]["id"]
   item = client.get_item(
     table_name: ENV["RUBY_LAMBDA_TABLE"],

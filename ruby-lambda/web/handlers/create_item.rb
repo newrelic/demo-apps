@@ -4,7 +4,7 @@ require "aws-sdk-dynamodb"
 
 class ItemAlreadyExistsError < StandardError; end
 
-def handler(event:, context:)
+def lambda_handler(event:, context:)
   puts event
   # body = JSON.parse(event["body"])
   item = event["body"].slice("id", "name")
