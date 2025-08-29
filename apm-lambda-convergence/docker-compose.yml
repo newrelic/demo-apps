@@ -1,0 +1,24 @@
+services:
+  webapp:
+    build:
+      context: ./app
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_VERSION=docker-compose-v3.0
+      # This URL must be set to the deployed API Gateway endpoint for the invoke to work.
+      # For local-only testing, this will be empty and the feature will not work.
+      - API_GATEWAY_URL=
+    container_name: demo-webapp
+    restart: unless-stopped
+
+  locust:
+    image: locustio/locust
+    ports:
+      - "8089:8089" # Locust UI
+    volumes:
+      - ./locust:/mnt/locust
+    command: -f /mnt/locust/locustfile.py --host http://webapp:8000
+    container_name: demo-locust
+    depends_on:
+      - webapp

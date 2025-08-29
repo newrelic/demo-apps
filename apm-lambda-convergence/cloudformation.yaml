@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Deploys a Python 3.13 Lambda function with an HTTP API Gateway trigger.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: 'DemoApp'
+  LambdaS3Bucket:
+    Type: String
+    Description: The S3 bucket where the Lambda deployment package is stored.
+  LambdaS3Key:
+    Type: String
+    Description: The S3 key (path) for the Lambda deployment package (.zip).
+
+Resources:
+  # --- IAM Role for the Lambda Function ---
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-LambdaExecutionRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # --- Lambda Function ---
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-MyLambda'
+      Handler: app.handler
+      Runtime: python3.13
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaS3Bucket
+        S3Key: !Ref LambdaS3Key
+      Timeout: 30
+      Architectures:
+        - x86_64
+
+  # --- HTTP API Gateway ---
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${ProjectName}-HttpApi'
+      ProtocolType: HTTP
+      Target: !GetAtt MyLambdaFunction.Arn
+
+  # --- Lambda Permission for API Gateway ---
+  # Grants the API Gateway permission to invoke the Lambda function.
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt MyLambdaFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*"
+
+Outputs:
+  LambdaFunctionName:
+    Description: "The name of the created Lambda function."
+    Value: !Ref MyLambdaFunction
+  ApiGatewayEndpoint:
+    Description: "The endpoint URL for the HTTP API Gateway."
+    Value: !GetAtt HttpApi.ApiEndpoint
