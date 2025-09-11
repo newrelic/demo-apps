@@ -11,13 +11,14 @@ Final Architecture
 
 ```mermaid
 graph LR;
-    A(User's Browser) -->|HTTP Request|B(EC2 Host);
+    A(User's Browser) --> C;
     subgraph B [EC2 Instance]
         direction LR
         C(Web App Container) --> D(Hop Service Container);
+        E(Locust Load Gen) --> C
     end
-    D --> |API Call| E(API Gateway);
-    E --> F(AWS Lambda);
+    D --> |API Call| F(HTTP API Gateway);
+    F --> G(AWS Lambda);
 ```
 
 Project Structure
@@ -32,19 +33,18 @@ This is the required folder and file structure for the deployment script to work
 │   │   └── script.js
 │   ├── templates/
 │   │   └── index.html
-│   ├── main.py
 │   ├── Dockerfile
+│   ├── main.py
 │   └── requirements.txt
 ├── hop-service/              # The intermediate Flask "hop" service
-│   ├── main.py
 │   ├── Dockerfile
+│   ├── main.py
 │   └── requirements.txt
 ├── lambda/                   # The AWS Lambda handler code with manually downloaded New Relic layer
 │   ├── app.py
 │   └── newrelic-layer.zip
 ├── locust/                   # The Locust app for load generation
 │   ├── locustfile.py
-│   └── Dockerfile
 ├── cloudformation.yaml       # CloudFormation template for all AWS resources
 ├── deploy.sh                 # Script to automate the entire deployment
 ├── docker-compose.yml        # Defines the multi-container setup for EC2
