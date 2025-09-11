@@ -5,8 +5,8 @@ import json
 
 app = Flask(__name__)
 
-# The URL for the deployed API Gateway endpoint
-API_GATEWAY_URL = os.getenv('API_GATEWAY_URL')
+# The internal Docker network URL for the hop-service
+HOP_SERVICE_URL = "http://hop-service:8001/invoke"
 
 @app.route('/')
 def home():
@@ -20,38 +20,28 @@ def health_check():
 
 @app.route('/invoke-lambda', methods=['POST'])
 def invoke_lambda():
-    """Invokes the backend Lambda function via API Gateway."""
-    if not API_GATEWAY_URL:
-        return jsonify({
-            "error": "API_GATEWAY_URL is not configured on the server."
-        }), 500
-
+    """Invokes the backend Lambda function via the hop service."""
     try:
-        # Get the original action ('success' or 'error') from the frontend
         action_data = request.get_json()
-
-        # Forward the request to the API Gateway endpoint
         headers = {'Content-Type': 'application/json'}
-        response = requests.post(API_GATEWAY_URL, headers=headers, json=action_data)
 
-        # Ensure the response from the API Gateway is valid JSON
-        response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-        
-        # Return the JSON response from the Lambda function directly to the frontend
+        # Make the request to the intermediate hop-service
+        response = requests.post(HOP_SERVICE_URL, headers=headers, json=action_data, timeout=5)
+
+        # The hop-service is already handling HTTP errors from the API Gateway.
+        # We can now simply forward the response (whether it's a success or a JSON error)
+        # and its status code directly to the browser.
         return response.json(), response.status_code
 
-    except requests.exceptions.HTTPError as http_err:
-        # Handle HTTP errors from API Gateway (e.g., 403 Forbidden, 502 Bad Gateway)
-        print(f"HTTP error occurred: {http_err}")
-        try:
-            # Try to return the error response from the API/Lambda if available
-            return http_err.response.json(), http_err.response.status_code
-        except json.JSONDecodeError:
-            return jsonify({"error": "Received a non-JSON error response from the API.", "details": http_err.response.text}), 500
+    except requests.exceptions.RequestException as req_err:
+        # This block now only catches true network errors (e.g., timeout, DNS failure)
+        # between the webapp and the hop-service.
+        print(f"--- WEBAPP-ERROR: A network error occurred trying to reach hop-service: {req_err} ---")
+        return jsonify({"error": "A network error occurred between the webapp and the hop-service.", "details": str(req_err)}), 500
             
     except Exception as e:
-        print(f"An error occurred: {e}")
-        return jsonify({"error": "An internal server error occurred.", "details": str(e)}), 500
+        print(f"An error occurred in webapp: {e}")
+        return jsonify({"error": "An internal server error occurred in the webapp.", "details": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)

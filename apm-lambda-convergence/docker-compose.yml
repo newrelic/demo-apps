@@ -20,7 +20,7 @@ services:
     environment:
       # This URL must be set to the deployed API Gateway endpoint for the invoke to work.
       API_GATEWAY_URL: ${API_GATEWAY_URL}
-      NEW_RELIC_LICENSE_KEY:  ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
       NEW_RELIC_APP_NAME: demo-hop-service
       NEW_RELIC_LOG_LEVEL: info
     container_name: demo-hop-service

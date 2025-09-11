@@ -9,24 +9,30 @@ REGION=${AWS_REGION:-us-east-1}
 
 # --- Argument Parsing ---
 # Initialize variables
+PROJECT_NAME=""
 S3_BUCKET=""
 STACK_NAME=""
 KEY_PAIR_NAME=""
+NEW_RELIC_LICENSE_KEY=""
+NEW_RELIC_ACCOUNT_ID=""
 
 # Parse named arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
+        --project-name) PROJECT_NAME="$2"; shift ;;
         --bucket) S3_BUCKET="$2"; shift ;;
         --stack) STACK_NAME="$2"; shift ;;
         --key-pair) KEY_PAIR_NAME="$2"; shift ;;
+        --nr-license-key) NEW_RELIC_LICENSE_KEY="$2"; shift ;;
+        --nr-account-id) NEW_RELIC_ACCOUNT_ID="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
 
 # Validate required arguments
-if [ -z "$S3_BUCKET" ] || [ -z "$STACK_NAME" ] || [ -z "$KEY_PAIR_NAME" ]; then
-    echo "Usage: $0 --bucket <S3_BUCKET_NAME> --stack <STACK_NAME> --key-pair <EC2_KEY_PAIR_NAME>"
+if [ -z "$PROJECT_NAME" ] || [ -z "$S3_BUCKET" ] || [ -z "$STACK_NAME" ] || [ -z "$KEY_PAIR_NAME" ] || [ -z "$NEW_RELIC_LICENSE_KEY" ] || [ -z "$NEW_RELIC_ACCOUNT_ID" ]; then
+    echo "Usage: $0 --project-name <PROJECT_NAME> --bucket <S3_BUCKET_NAME> --stack <STACK_NAME> --key-pair <EC2_KEY_PAIR_NAME> --nr-license-key <NEW_RELIC_LICENSE_KEY> --nr-account-id <NEW_RELIC_ACCOUNT_ID>"
     exit 1
 fi
 
@@ -67,14 +73,17 @@ echo "--- Deploying CloudFormation Stack ---"
 aws cloudformation deploy \
     --template-file cloudformation.yaml \
     --stack-name $STACK_NAME \
-    --capabilities CAPABILITY_IAM \
+    --capabilities CAPABILITY_NAMED_IAM \
     --region $REGION \
     --parameter-overrides \
+        ProjectName=$PROJECT_NAME \
         LambdaS3Bucket=$S3_BUCKET \
         LambdaS3Key=$FUNCTION_PACKAGE_NAME \
         LambdaLayerS3Key=$LAYER_PACKAGE_NAME \
         KeyName=$KEY_PAIR_NAME \
-        MyIpAddress=$MY_IP
+        MyIpAddress=$MY_IP \
+        NewRelicLicenseKey=$NEW_RELIC_LICENSE_KEY \
+        NewRelicAccountId=$NEW_RELIC_ACCOUNT_ID
 
 echo ""
 echo "✅ Deployment initiated for stack '$STACK_NAME'."

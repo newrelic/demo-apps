@@ -6,7 +6,7 @@ Description: >
 Parameters:
   ProjectName:
     Type: String
-    Default: 'DemoApp'
+    Default: 'APMLambdaDemo'
   LambdaS3Bucket:
     Type: String
     Description: The S3 bucket where the Lambda deployment package is stored.
@@ -27,6 +27,14 @@ Parameters:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: '/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id'
     Description: The latest Ubuntu 22.04 AMI ID for the current region.
+  NewRelicLicenseKey:
+    Type: String
+    Description: Your New Relic Ingest License Key.
+    NoEcho: true
+  NewRelicAccountId:
+    Type: String
+    Description: Your New Relic Account ID.
+    NoEcho: true
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -80,7 +88,7 @@ Resources:
   MyLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${ProjectName}-MyLambda'
+      FunctionName: !Sub '${ProjectName}-Lambda'
       Handler: app.handler
       Runtime: python3.13
       Role: !GetAtt LambdaExecutionRole.Arn
@@ -92,6 +100,18 @@ Resources:
         - x86_64
       Layers:
         - !Ref NewRelicLambdaLayer
+      Environment:
+        Variables:
+          NEW_RELIC_ACCOUNT_ID: !Ref NewRelicAccountId
+          NEW_RELIC_LICENSE_KEY: !Ref NewRelicLicenseKey
+          NEW_RELIC_LAMBDA_HANDLER: 'lambda_function.lambda_handler'
+          NEW_RELIC_APM_LAMBDA_MODE: 'true'
+          NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: 'true'
+          NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: 'true' 
+          NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS: 'false'
+      Tags:
+        - Key: 'NR.Apm.Lambda.Mode'
+          Value: 'true'
 
   # --- HTTP API Gateway ---
   HttpApi:
@@ -122,6 +142,10 @@ Resources:
           ToPort: 8000
           CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
+          FromPort: 8089
+          ToPort: 8089
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: !Ref MyIpAddress
@@ -135,6 +159,9 @@ Resources:
       SecurityGroupIds:
         - !GetAtt InstanceSecurityGroup.GroupId
       ImageId: !Ref LatestAmiId
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-EC2Instance'
       UserData:
         Fn::Base64: |
           #!/bin/bash
@@ -175,7 +202,6 @@ Outputs:
   EC2PublicIp:
     Description: "Public IP address of the EC2 instance."
     Value: !GetAtt EC2Instance.PublicIp
-  EC2PublicDnsName:
-    Description: "Public DNS name of the EC2 instance."
-    Value: !GetAtt EC2Instance.PublicDnsName
-
+  EC2InstanceName:
+    Description: "The 'Name' tag of the EC2 instance."
+    Value: !Sub '${ProjectName}-EC2Instance'
