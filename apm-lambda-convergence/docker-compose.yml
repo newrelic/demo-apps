@@ -5,11 +5,25 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - APP_VERSION=docker-compose-v3.0
-      # This URL must be set to the deployed API Gateway endpoint for the invoke to work.
-      # For local-only testing, this will be empty and the feature will not work.
-      - API_GATEWAY_URL=
+      HOP_SERVICE_URL: http://hop-service:8001
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_APP_NAME: demo-webapp
+      NEW_RELIC_LOG_LEVEL: info
     container_name: demo-webapp
+    restart: unless-stopped
+    depends_on:
+      - hop-service
+
+  hop-service:
+    build:
+      context: ./hop-service
+    environment:
+      # This URL must be set to the deployed API Gateway endpoint for the invoke to work.
+      API_GATEWAY_URL: ${API_GATEWAY_URL}
+      NEW_RELIC_LICENSE_KEY:  ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_APP_NAME: demo-hop-service
+      NEW_RELIC_LOG_LEVEL: info
+    container_name: demo-hop-service
     restart: unless-stopped
 
   locust:

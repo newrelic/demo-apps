@@ -1,38 +1,93 @@
 #!/bin/bash
 set -e
 
-# Check for required arguments
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <S3_BUCKET_NAME> <STACK_NAME>"
+# --- Configuration ---
+# Package names for the Lambda function and the New Relic layer
+FUNCTION_PACKAGE_NAME="lambda_package.zip"
+LAYER_PACKAGE_NAME="newrelic-layer.zip"
+REGION=${AWS_REGION:-us-east-1}
+
+# --- Argument Parsing ---
+# Initialize variables
+S3_BUCKET=""
+STACK_NAME=""
+KEY_PAIR_NAME=""
+
+# Parse named arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --bucket) S3_BUCKET="$2"; shift ;;
+        --stack) STACK_NAME="$2"; shift ;;
+        --key-pair) KEY_PAIR_NAME="$2"; shift ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+# Validate required arguments
+if [ -z "$S3_BUCKET" ] || [ -z "$STACK_NAME" ] || [ -z "$KEY_PAIR_NAME" ]; then
+    echo "Usage: $0 --bucket <S3_BUCKET_NAME> --stack <STACK_NAME> --key-pair <EC2_KEY_PAIR_NAME>"
     exit 1
 fi
 
-S3_BUCKET=$1
-STACK_NAME=$2
-PACKAGE_NAME="lambda_package.zip"
-REGION=${AWS_REGION:-us-east-1}
+# Automatically detect public IP address
+# Note: This requires the 'dig' command-line tool (part of dnsutils/bind-utils)
+MY_IP=$(dig +short myip.opendns.com @resolver1.opendns.com)/32
+if [ -z "$MY_IP" ]; then
+    echo "Could not determine public IP address."
+    exit 1
+fi
+echo "--- Automatically detected public IP for SSH: $MY_IP ---"
 
-echo "--- Preparing Lambda Deployment Package ---"
+
+echo "--- Preparing Lambda Deployment Packages ---"
 # Create a temporary directory for packaging
 mkdir -p build
-# Remove old package if it exists
-rm -f build/$PACKAGE_NAME
-# Zip the contents of the lambda directory
-(cd lambda && zip -r ../build/$PACKAGE_NAME .)
+# Remove old packages if they exist
+rm -f build/$FUNCTION_PACKAGE_NAME
 
-echo "--- Uploading Package to S3 ---"
-aws s3 cp build/$PACKAGE_NAME s3://$S3_BUCKET/$PACKAGE_NAME
+# Zip the contents of the lambda directory for the function code
+(cd lambda && zip -r ../build/$FUNCTION_PACKAGE_NAME app.py)
+
+# Check if the New Relic layer zip exists
+if [ ! -f "lambda/$LAYER_PACKAGE_NAME" ]; then
+    echo "Error: New Relic layer package 'lambda/$LAYER_PACKAGE_NAME' not found."
+    echo "Please download it and place it in the 'lambda' directory."
+    exit 1
+fi
+
+
+echo "--- Uploading Packages to S3 ---"
+aws s3 cp build/$FUNCTION_PACKAGE_NAME s3://$S3_BUCKET/$FUNCTION_PACKAGE_NAME
+aws s3 cp lambda/$LAYER_PACKAGE_NAME s3://$S3_BUCKET/$LAYER_PACKAGE_NAME
+
 
 echo "--- Deploying CloudFormation Stack ---"
+# The 'deploy' command handles both creation and updates
 aws cloudformation deploy \
-    --template-file template.yaml \
+    --template-file cloudformation.yaml \
     --stack-name $STACK_NAME \
     --capabilities CAPABILITY_IAM \
     --region $REGION \
     --parameter-overrides \
         LambdaS3Bucket=$S3_BUCKET \
-        LambdaS3Key=$PACKAGE_NAME
+        LambdaS3Key=$FUNCTION_PACKAGE_NAME \
+        LambdaLayerS3Key=$LAYER_PACKAGE_NAME \
+        KeyName=$KEY_PAIR_NAME \
+        MyIpAddress=$MY_IP
 
 echo ""
 echo "✅ Deployment initiated for stack '$STACK_NAME'."
-echo "Check the AWS CloudFormation console in the '$REGION' region for status."
+echo "Waiting for stack deployment to complete..."
+
+# The 'deploy' command is synchronous and waits for completion, so no extra 'wait' is needed.
+
+echo "--- Deployment Complete! Fetching Outputs... ---"
+aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --query "Stacks[0].Outputs" \
+    --output table \
+    --region "$REGION"
+
+echo ""
+echo "Next steps are in the README.md"

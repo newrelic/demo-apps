@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  Deploys a Python 3.13 Lambda function with an HTTP API Gateway trigger.
+  Deploys a full-stack demo application including a frontend EC2 host
+  (running Docker), and a backend Python Lambda with an HTTP API Gateway and New Relic Layer.
 
 Parameters:
   ProjectName:
@@ -12,6 +13,40 @@ Parameters:
   LambdaS3Key:
     Type: String
     Description: The S3 key (path) for the Lambda deployment package (.zip).
+  LambdaLayerS3Key:
+    Type: String
+    Description: The S3 key (path) for the New Relic Lambda Layer package (.zip).
+  MyIpAddress:
+    Type: String
+    Description: Your public IP address for SSH access to the EC2 instance.
+    Default: '0.0.0.0/0'
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance.
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id'
+    Description: The latest Ubuntu 22.04 AMI ID for the current region.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Application Configuration"
+        Parameters:
+          - ProjectName
+      - Label:
+          default: "Backend Lambda Configuration"
+        Parameters:
+          - LambdaS3Bucket
+          - LambdaS3Key
+          - LambdaLayerS3Key
+      - Label:
+          default: "Frontend EC2 Configuration"
+        Parameters:
+          - KeyName
+          - MyIpAddress
+          - LatestAmiId
 
 Resources:
   # --- IAM Role for the Lambda Function ---
@@ -24,12 +59,22 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # --- New Relic Lambda Layer ---
+  NewRelicLambdaLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: !Sub '${ProjectName}-NewRelicLayer'
+      Description: "New Relic layer for monitoring"
+      Content:
+        S3Bucket: !Ref LambdaS3Bucket
+        S3Key: !Ref LambdaLayerS3Key
+      CompatibleRuntimes:
+        - python3.13
 
   # --- Lambda Function ---
   MyLambdaFunction:
@@ -45,6 +90,8 @@ Resources:
       Timeout: 30
       Architectures:
         - x86_64
+      Layers:
+        - !Ref NewRelicLambdaLayer
 
   # --- HTTP API Gateway ---
   HttpApi:
@@ -55,14 +102,68 @@ Resources:
       Target: !GetAtt MyLambdaFunction.Arn
 
   # --- Lambda Permission for API Gateway ---
-  # Grants the API Gateway permission to invoke the Lambda function.
   LambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt MyLambdaFunction.Arn
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*"
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*"
+
+  # --- EC2 Security Group ---
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${ProjectName}-SG'
+      GroupDescription: Enable HTTP and restricted SSH access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIpAddress
+
+  # --- EC2 Instance ---
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !GetAtt InstanceSecurityGroup.GroupId
+      ImageId: !Ref LatestAmiId
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          # Install prerequisites and add Docker's official GPG key
+          apt-get update -y
+          apt-get install -y ca-certificates curl gnupg git
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          chmod a+r /etc/apt/keyrings/docker.gpg
+
+          # Add the Docker repository to Apt sources
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+            tee /etc/apt/sources.list.d/docker.list > /dev/null
+          
+          # Install Docker Engine and related tools
+          apt-get update -y
+          apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+          # Install standalone docker-compose for compatibility with existing scripts
+          apt-get install -y docker-compose
+          
+          # Add ubuntu user to the docker group to run docker without sudo
+          usermod -aG docker ubuntu
+          
+          # Ensure Docker service is started and enabled
+          systemctl start docker
+          systemctl enable docker
 
 Outputs:
   LambdaFunctionName:
@@ -71,3 +172,10 @@ Outputs:
   ApiGatewayEndpoint:
     Description: "The endpoint URL for the HTTP API Gateway."
     Value: !GetAtt HttpApi.ApiEndpoint
+  EC2PublicIp:
+    Description: "Public IP address of the EC2 instance."
+    Value: !GetAtt EC2Instance.PublicIp
+  EC2PublicDnsName:
+    Description: "Public DNS name of the EC2 instance."
+    Value: !GetAtt EC2Instance.PublicDnsName
+
