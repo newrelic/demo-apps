@@ -4,45 +4,72 @@ class WebAppUser(HttpUser):
     """
     User class that defines the behavior of a simulated user for the demo web app.
     """
-    # Wait time between tasks for each user, between 1 and 3 seconds.
-    wait_time = between(1, 3)
+    # Each user will wait a random time between 0.5 and 2 seconds after each task.
+    wait_time = between(0.5, 2)
 
-    @task(2) # This task will be picked twice as often as the others
-    def load_home_page(self):
-        """Simulates a user visiting the home page."""
+    @task(47)
+    def successful_journey(self):
+        """
+        Simulates a user journey:
+        1. Load the home page.
+        2. Invoke the 'success' action.
+        This is the most common user path.
+        """
+        # Step 1: Load the home page
         self.client.get(
             "/",
-            name="Load Home Page" # Group all root requests under this name in the UI
+            name="Journey - Load Home Page"
         )
-
-    @task(1)
-    def invoke_success(self):
-        """
-        Simulates a user clicking the 'Invoke Success' button by sending a POST
-        request to the /invoke-lambda endpoint with the 'success' action.
-        """
+        
+        # Step 2: Invoke the success action
         self.client.post(
             "/invoke-lambda",
             json={"action": "success"},
-            name="Invoke Lambda (Success)" # Group success calls in the UI
+            name="Journey - Invoke Lambda (Success)"
         )
 
-    @task(1)
-    def invoke_error(self):
+    @task(2)
+    def error_journey(self):
         """
-        Simulates a user clicking the 'Invoke Error' button by sending a POST
-        request to the /invoke-lambda endpoint with the 'error' action.
+        Simulates a user journey that results in a handled error (400 response).
+        This task weight results in an error rate of ~4%.
         """
+        # Step 1: Load the home page
+        self.client.get(
+            "/",
+            name="Journey - Load Home Page" # Grouped with the other home page loads
+        )
+
+        # Step 2: Invoke the error action
         self.client.post(
             "/invoke-lambda",
             json={"action": "error"},
-            name="Invoke Lambda (Error)" # Group error calls in the UI
+            name="Journey - Invoke Lambda (Error)"
+        )
+
+    @task(1)
+    def malformed_json_journey(self):
+        """
+        Simulates a client sending a malformed JSON payload,
+        which will cause an unhandled exception in the Lambda (500 response).
+        This task weight results in an error rate of ~2%.
+        """
+        # Step 1: Load the home page
+        self.client.get(
+            "/",
+            name="Journey - Load Home Page" # Grouped with the other home page loads
+        )
+
+        # Step 2: Post a broken JSON string
+        self.client.post(
+            "/invoke-lambda",
+            data='{"action": "bad-json", "extra-key": }', # Malformed JSON
+            headers={'Content-Type': 'application/json'},
+            name="Journey - Invoke Lambda (Bad JSON)"
         )
 
     def on_start(self):
         """
         This method is called when a new user is started.
-        Good for login actions or initial setup.
         """
         print("A new simulated user is starting.")
-

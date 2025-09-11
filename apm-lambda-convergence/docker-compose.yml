@@ -7,7 +7,7 @@ services:
     environment:
       HOP_SERVICE_URL: http://hop-service:8001
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
-      NEW_RELIC_APP_NAME: demo-webapp
+      NEW_RELIC_APP_NAME: ${PROJECT_NAME}-webapp
       NEW_RELIC_LOG_LEVEL: info
     container_name: demo-webapp
     restart: unless-stopped
@@ -21,7 +21,7 @@ services:
       # This URL must be set to the deployed API Gateway endpoint for the invoke to work.
       API_GATEWAY_URL: ${API_GATEWAY_URL}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
-      NEW_RELIC_APP_NAME: demo-hop-service
+      NEW_RELIC_APP_NAME: ${PROJECT_NAME}-hop-service
       NEW_RELIC_LOG_LEVEL: info
     container_name: demo-hop-service
     restart: unless-stopped
@@ -29,10 +29,10 @@ services:
   locust:
     image: locustio/locust
     ports:
-      - "8089:8089" # Locust UI
+      - "8089:8089"
     volumes:
       - ./locust:/mnt/locust
-    command: -f /mnt/locust/locustfile.py --host http://webapp:8000
+    command: -f /mnt/locust/locustfile.py --host http://webapp:8000 --autostart -u 4 -r 1
     container_name: demo-locust
     depends_on:
       - webapp

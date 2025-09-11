@@ -29,7 +29,9 @@ This is the required folder and file structure for the deployment script to work
 .
 ├── app/                      # The user-facing Flask web application
 │   ├── static/
+│   │   └── script.js
 │   ├── templates/
+│   │   └── index.html
 │   ├── main.py
 │   ├── Dockerfile
 │   └── requirements.txt
@@ -37,14 +39,16 @@ This is the required folder and file structure for the deployment script to work
 │   ├── main.py
 │   ├── Dockerfile
 │   └── requirements.txt
-├── lambda/
-│   ├── app.py                # The AWS Lambda handler code
-│   └── newrelic-layer.zip    # The manually downloaded New Relic layer
+├── lambda/                   # The AWS Lambda handler code with manually downloaded New Relic layer
+│   ├── app.py
+│   └── newrelic-layer.zip
+├── locust/                   # The Locust app for load generation
+│   ├── locustfile.py
+│   └── Dockerfile
 ├── cloudformation.yaml       # CloudFormation template for all AWS resources
 ├── deploy.sh                 # Script to automate the entire deployment
 ├── docker-compose.yml        # Defines the multi-container setup for EC2
-└── README.md                 # This guide
-
+└── README.md
 ```
 
 Deployment Walkthrough
@@ -84,7 +88,7 @@ This script will provision all the necessary AWS resources, including the Lambda
     export KEY_PAIR_NAME=""
     export NEW_RELIC_LICENSE_KEY=""
     export NEW_RELIC_ACCOUNT_ID=""
-    echo -e "BUCKET: $S3_BUCKET\nSTACK: $STACK_NAME\nKEYPAIR: $KEY_PAIR_NAME\nNR LICENSE: $NEW_RELIC_LICENSE_KEY\nNR ACCOUNT: $NEW_RELIC_ACCOUNT_ID"
+    echo -e "\nPROJECT: $PROJECT_NAME\n\tBUCKET: $S3_BUCKET\n\tSTACK: $STACK_NAME\n\tKEYPAIR: $KEY_PAIR_NAME\n\tNR LICENSE: $NEW_RELIC_LICENSE_KEY\n\tNR ACCOUNT: $NEW_RELIC_ACCOUNT_ID"
     ```
 
     ```sh
@@ -105,7 +109,6 @@ Now, you will connect to the newly created EC2 instance to set up and run the fr
 1.  **SSH into the EC2 Instance**: Use the `.pem` file for your key pair and the `EC2PublicIp` from the script's output. The username for the Ubuntu instance is `ubuntu`.
     ```sh
     ssh -i /path/to/your-key.pem ubuntu@<EC2PublicIp>
-
     ```
 
 2.  **Clone the Project Directory on the EC2 Instance**: Once connected via SSH, you need to get the project files. Since this project lives in a subdirectory of a larger repository, using `git sparse-checkout` is the most efficient way to download only the necessary files.
@@ -127,14 +130,17 @@ Now, you will connect to the newly created EC2 instance to set up and run the fr
     ```
     This process ensures that only the `apm-lambda-convergence` directory is downloaded to the EC2 instance, saving time and disk space.
 
-3.  **Configure the API Gateway URL**: You need to tell the `hop-service` the URL of the deployed backend. Set it as an environment variable in your SSH session. This method is cleaner than editing files manually.
+3.  **Configure the Variables**: You need to tell the services the New Relic license key and the URL of the deployed backend. Set them as environment variables in your SSH session. This method is cleaner than editing files manually.
 
     ```sh
-    export API_GATEWAY_URL="<Paste the ApiGatewayEndpoint URL here>"
+    export API_GATEWAY_URL=""
+    export NEW_RELIC_LICENSE_KEY=""
+    export PROJECT_NAME=""
+    echo -e "\nAPI GATEWAY: $API_GATEWAY_URL\nLICENSE KEY: $NEW_RELIC_LICENSE_KEY\nPROJECT: $PROJECT_NAME"
     ```
-    Docker Compose will automatically detect this environment variable and pass it into the `hop-service` container.
+    Docker Compose will automatically detect these environment variables and pass them into Docker Compose.
 
-4.  **Run the Docker Containers**: With the environment variable configured, start the services using Docker Compose. The `ubuntu` user has been added to the `docker` group, so `sudo` is not required.
+4.  **Run the Docker Containers**: With the environment variables configured, start the services using Docker Compose. The `ubuntu` user has been added to the `docker` group, so `sudo` is not required.
     ```sh
     docker-compose up --build -d
     ```
@@ -143,10 +149,12 @@ Now, you will connect to the newly created EC2 instance to set up and run the fr
 
 The application is now fully deployed and running in the cloud.
 1.  **Access the Web UI**: Open your local web browser and navigate to the public IP of your EC2 instance on port 8000: `http://<EC2PublicIp>:8000`
-2.  **Access Locust UI**: Open a new tab and navigate to the public IP on port 8089: `http://<EC2PublicIp>:8089`
-3.  **Use the UI**:
+2.  **Use the UI**:
     -   Click **"Invoke Success"** or **"Invoke Error"** to send single requests through the entire stack.
     -   Observe the response from the Lambda function displayed on the page.
+3.  **Access Locust UI**: Locust will automatically start load gen, but you can also navigate to the UI if you need to do something like a stress test.
+    -   Open a new tab and navigate to the public IP on port 8089: `http://<EC2PublicIp>:8089`
+    -   The containers run with 4 workers, running a higher number of users in Locust will create a queue that should result in increased latency, a throughput plateau, and potential timeouts.
 
 Tearing Down the Stack
 ----------------------

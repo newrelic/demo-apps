@@ -61,7 +61,7 @@ Resources:
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${ProjectName}-LambdaExecutionRole'
+      RoleName: !Sub '${ProjectName}-lambda-execution-role'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -76,7 +76,7 @@ Resources:
   NewRelicLambdaLayer:
     Type: AWS::Lambda::LayerVersion
     Properties:
-      LayerName: !Sub '${ProjectName}-NewRelicLayer'
+      LayerName: !Sub '${ProjectName}-new-relic-layer'
       Description: "New Relic layer for monitoring"
       Content:
         S3Bucket: !Ref LambdaS3Bucket
@@ -88,7 +88,7 @@ Resources:
   MyLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${ProjectName}-Lambda'
+      FunctionName: !Sub '${ProjectName}-lambda-function'
       Handler: app.handler
       Runtime: python3.13
       Role: !GetAtt LambdaExecutionRole.Arn
@@ -117,7 +117,7 @@ Resources:
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
-      Name: !Sub '${ProjectName}-HttpApi'
+      Name: !Sub '${ProjectName}-http-api-gateway'
       ProtocolType: HTTP
       Target: !GetAtt MyLambdaFunction.Arn
 
@@ -134,7 +134,7 @@ Resources:
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub '${ProjectName}-SG'
+      GroupName: !Sub '${ProjectName}-security-group'
       GroupDescription: Enable HTTP and restricted SSH access
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -161,7 +161,9 @@ Resources:
       ImageId: !Ref LatestAmiId
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectName}-EC2Instance'
+          Value: !Sub '${ProjectName}-ec2-instance'
+        - Key: app
+          Value: !Sub '${ProjectName}'
       UserData:
         Fn::Base64: |
           #!/bin/bash
@@ -204,4 +206,4 @@ Outputs:
     Value: !GetAtt EC2Instance.PublicIp
   EC2InstanceName:
     Description: "The 'Name' tag of the EC2 instance."
-    Value: !Sub '${ProjectName}-EC2Instance'
+    Value: !Sub '${ProjectName}-ec2-instance'
