@@ -1,7 +1,7 @@
 Full-Stack AWS Demo for APM
 ===========================
 
-This project provides a deployable, multi-tier web application designed to demonstrate Application Performance Monitoring (APM) and distributed tracing across a distributed system on AWS. It consists of a multi-container Python Flask frontend running on EC2, which communicates with a Python backend running on AWS Lambda via an API Gateway.
+This project provides a deployable, multi-tier web application designed to demonstrate Application Performance Monitoring (APM) and distributed tracing across a distributed system on AWS. It consists of a multi-container Python Flask frontend running on EC2, which communicates with a Python backend running on AWS Lambda via an API Gateway. A Locust app runs locally on the EC2 host as a container with a predefined load generation policy.
 -   The Lambda is instrumented with the [New Relic Lambda Layer](https://docs.newrelic.com/docs/serverless-function-monitoring/aws-lambda-monitoring/instrument-lambda-function/configure-serverless-aws-monitoring/ "null") provided as a private zip file.
     -   *This method is useful for custom layer versions or in environments where direct access to public AWS layers is restricted.*
 The entire infrastructure is defined as code using AWS CloudFormation for easy, repeatable, and automated deployments.
@@ -24,7 +24,7 @@ graph LR;
 Project Structure
 -----------------
 
-This is the required folder and file structure for the deployment script to work correctly. Note the placement of the `newrelic-layer.zip` file, which is a non-standard deployment pattern as most would pull the layer at runtime. This is in place to avoid potential conflict in cases where an AWS account doesn't allow cross-account layer execution.
+This is the required folder and file structure for the deployment script to work correctly.
 
 ```
 .
@@ -79,7 +79,8 @@ This script will provision all the necessary AWS resources, including the Lambda
     -   `--key-pair`: The name of your EC2 key pair.
     -   `--nr-license-key`: The ingest license key for your New Relic account.
     -   `--nr-account-id`: The ID for your target New Relic account.
-    _**Choosing a `project-name`:** This value is used as a prefix. For example, if you provide `MyWebApp`, the script will create resources named `MyWebApp-Lambda`, `MyWebApp-EC2Instance`, etc. Choose a concise name and avoid including terms like "Lambda" or "EC2" in it, as the template already adds those suffixes._
+
+    > _**Choosing a `project-name`:** This value is used as a prefix. For example, if you provide `MyWebApp`, the script will create resources named `MyWebApp-Lambda`, `MyWebApp-EC2Instance`, etc. Choose a concise name and avoid including terms like "Lambda" or "EC2" in it, as the template already adds those suffixes._
     ```sh
     # example using vars
     export PROJECT_NAME=""
@@ -123,6 +124,7 @@ Now, you will connect to the newly created EC2 instance to set up and run the fr
     git sparse-checkout set apm-lambda-convergence
 
     # Finally, pull down the files for only that directory
+    # Change <main> here if you're using a feature branch
     git checkout main
 
     # Navigate into the project directory
@@ -130,15 +132,14 @@ Now, you will connect to the newly created EC2 instance to set up and run the fr
     ```
     This process ensures that only the `apm-lambda-convergence` directory is downloaded to the EC2 instance, saving time and disk space.
 
-3.  **Configure the Variables**: You need to tell the services the New Relic license key and the URL of the deployed backend. Set them as environment variables in your SSH session. This method is cleaner than editing files manually.
+3.  **Configure the Variables**: You need to tell the services the, project name, URL of the deployed backend, and New Relic license key. Set them as environment variables in your SSH session. This method is cleaner than editing files manually.
 
     ```sh
+    export PROJECT_NAME=""
     export API_GATEWAY_URL=""
     export NEW_RELIC_LICENSE_KEY=""
-    export PROJECT_NAME=""
-    echo -e "\nAPI GATEWAY: $API_GATEWAY_URL\nLICENSE KEY: $NEW_RELIC_LICENSE_KEY\nPROJECT: $PROJECT_NAME"
+    echo -e "\nPROJECT: $PROJECT_NAME\n\tAPI GATEWAY: $API_GATEWAY_URL\n\tLICENSE KEY: $NEW_RELIC_LICENSE_KEY"
     ```
-    Docker Compose will automatically detect these environment variables and pass them into Docker Compose.
 
 4.  **Run the Docker Containers**: With the environment variables configured, start the services using Docker Compose. The `ubuntu` user has been added to the `docker` group, so `sudo` is not required.
     ```sh
