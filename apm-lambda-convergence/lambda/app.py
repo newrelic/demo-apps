@@ -50,6 +50,10 @@ def _handle_error(body):
     except urllib3.exceptions.MaxRetryError as e:
         # This is the expected outcome: the API call failed due to a connection error.
         logger.error(f"Downstream API failure: {e}")
+        
+        # Explicitly notify New Relic of the handled exception ***
+        newrelic.agent.notice_error()
+
         return {
             "statusCode": 503, # Service Unavailable is appropriate here
             "headers": {"Content-Type": "application/json"},
@@ -88,6 +92,10 @@ def handler(event, context):
     except json.JSONDecodeError as e:
         # This block specifically catches malformed JSON from the client.
         logger.error(f"JSON Decode Error: {e}", exc_info=True)
+
+        # Explicitly notify New Relic of the handled exception ***
+        newrelic.agent.notice_error()
+
         return {
             "statusCode": 400, # Bad Request, as the client sent invalid data
             "headers": {"Content-Type": "application/json"},
@@ -99,6 +107,10 @@ def handler(event, context):
     except Exception as e:
         # This is a catch-all for any other unexpected errors (like the ValueError above).
         logger.critical(f"An unexpected error occurred: {e}", exc_info=True)
+
+        # Explicitly notify New Relic of the handled exception ***
+        newrelic.agent.notice_error()
+
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
