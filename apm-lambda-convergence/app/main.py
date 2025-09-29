@@ -1,12 +1,19 @@
 from flask import Flask, render_template, jsonify, request # type: ignore
+import logging
 import os
 import requests # type: ignore
-import logging
+import uuid
+import newrelic.agent # type: ignore
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
+
+@app.before_request
+def before_request():
+    """Disable New Relic browser autorum before each request; this would usually be in the .ini"""
+    newrelic.agent.disable_browser_autorum()
 
 # The internal Docker network URL for the hop-service
 HOP_SERVICE_URL = "http://hop-service:8001/invoke"
@@ -28,6 +35,11 @@ def invoke_lambda():
     """Invokes the backend Lambda function via the hop service."""
     logging.info("Received request to invoke Lambda.")
     try:
+        # Generate a random user ID to help errors inbox show impacted users
+        user_id = str(uuid.uuid4())
+        newrelic.agent.set_user_id(user_id)
+        logging.info(f"User ID for this transaction: {user_id}")
+
         action_data = request.get_json()
         logging.info(f"Action data received: {action_data}")
         headers = {'Content-Type': 'application/json'}

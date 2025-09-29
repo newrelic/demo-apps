@@ -1,8 +1,8 @@
 from flask import Flask, jsonify, request # type: ignore
-import os
-import requests # type: ignore
 import json
 import logging
+import os
+import requests # type: ignore
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,7 +31,7 @@ def invoke_lambda_proxy():
 
         # Forward the request to the API Gateway endpoint
         headers = {'Content-Type': 'application/json'}
-        response = requests.post(api_gateway_url, headers=headers, json=action_data, timeout=5)
+        response = requests.post(api_gateway_url, headers=headers, json=action_data, timeout=4)
         logging.info(f"Received response from API Gateway with status: {response.status_code}")
 
         # Let the requests library raise an exception for bad status codes (4xx or 5xx)

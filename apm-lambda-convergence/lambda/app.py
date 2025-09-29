@@ -1,8 +1,10 @@
 import json
+import logging
 import platform
+import random
+import time
 import urllib3 # type: ignore
 import newrelic.agent # type: ignore
-import logging
 
 # Configure logging for Lambda
 logger = logging.getLogger()
@@ -24,44 +26,83 @@ def _handle_success(body):
 
 def _handle_error(body):
     """
-    Handles the gracefully handled error path.
-    This version simulates a failure to connect to a downstream service using the native urllib3 library.
+    Handles gracefully handled error paths by randomly selecting
+    one of the available error simulation functions.
     """
-    logger.info("Simulating a downstream connection failure.")
-    http = urllib3.PoolManager()
-    try:
-        # Attempt to call a non-existent downstream API using the native library.
-        # The timeout ensures the function doesn't hang for too long.
-        http.request(
-            'GET',
-            "http://api.external.dependency/data",
-            timeout=2.0
-        )
+    # Define the possible error types and randomly select one.
+    error_options = ["timeout", "service_error", "parsing_error", "connection_error"]
+    error_type = random.choice(error_options)
 
-        # This part should ideally not be reached
-        logger.warning("Downstream API call unexpectedly succeeded.")
+    logger.info(f"Randomly selected error type to simulate: '{error_type}'")
+
+    # 1. Simulate the downstream service taking too long to respond.
+    if error_type == "timeout":
+        logger.info("Simulating a 5-second delay to cause a timeout.")
+        time.sleep(5) 
+        # The request from the hop-service should time out before this completes.
+        # If it doesn't, we return an error indicating the timeout simulation failed.
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({
-                "error": "Downstream API call unexpectedly succeeded."
-            })
+            "body": json.dumps({"error": "Simulated timeout did not get interrupted as expected."})
         }
-    except urllib3.exceptions.MaxRetryError as e:
-        # This is the expected outcome: the API call failed due to a connection error.
-        logger.error(f"Downstream API failure: {e}")
-        
-        # Explicitly notify New Relic of the handled exception ***
-        newrelic.agent.notice_error()
 
+    # 2. Simulate the downstream service returning a 503 Service Unavailable error.
+    elif error_type == "service_error":
+        logger.error("Simulating a 503 Service Unavailable error from a downstream API.")
+        newrelic.agent.notice_error()
         return {
-            "statusCode": 503, # Service Unavailable is appropriate here
+            "statusCode": 503,
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps({
-                "error": "This is a simulated failure to connect to a downstream API.",
-                "details": str(e)
+                "error": "This is a simulated 503 error from a downstream API.",
+                "details": "The dependency service is currently unavailable."
             })
         }
+
+    # 3. Simulate receiving malformed JSON from a downstream service.
+    elif error_type == "parsing_error":
+        malformed_json = '{"message": "Success", "data": [incomplete_array}'
+        logger.error(f"Simulating a JSON parsing error with payload: {malformed_json}")
+        try:
+            json.loads(malformed_json)
+        except json.JSONDecodeError as e:
+            newrelic.agent.notice_error()
+            return {
+                "statusCode": 500,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({
+                    "error": "Failed to parse response from downstream API.",
+                    "details": str(e)
+                })
+            }
+
+    # 4. Simulate a failure to connect to a downstream service.
+    else: # This will be the "connection_error" case
+        http = urllib3.PoolManager()
+        try:
+            http.request(
+                'GET',
+                "http://api.external.dependency/data",
+                timeout=2.0,
+                retries=1
+            )
+            return {
+                "statusCode": 500,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({"error": "Downstream API call unexpectedly succeeded."})
+            }
+        except urllib3.exceptions.MaxRetryError as e:
+            logger.error(f"Downstream API connection failure: {e}")
+            newrelic.agent.notice_error()
+            return {
+                "statusCode": 503,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({
+                    "error": "This is a simulated failure to connect to a downstream API.",
+                    "details": str(e)
+                })
+            }
 
 # https://docs.newrelic.com/docs/apm/agents/python-agent/python-agent-api/backgroundtask-python-agent-api/
 @newrelic.agent.background_task()
