@@ -4,10 +4,29 @@ Full-Stack AWS Demo for APM
 This project provides a deployable, multi-tier web application designed to demonstrate Application Performance Monitoring (APM) and distributed tracing across a distributed system on AWS. It consists of a multi-container Python Flask frontend running on EC2, which communicates with a Python backend running on AWS Lambda via an API Gateway. A Locust app runs locally on the EC2 host as a container with a predefined load generation policy.
 -   The Lambda is instrumented with the [New Relic Lambda Layer](https://docs.newrelic.com/docs/serverless-function-monitoring/aws-lambda-monitoring/instrument-lambda-function/configure-serverless-aws-monitoring/ "null") provided as a private zip file.
     -   *This method is useful for custom layer versions or in environments where direct access to public AWS layers is restricted.*
+
 The entire infrastructure is defined as code using AWS CloudFormation for easy, repeatable, and automated deployments.
+
+Demo Touchpoints
+----------------
+
+The app stack supports the following touchpoints for a New Relic demo:
+  - APM<>Lambda Convergence
+  - Distributed Tracing
+  - Errors Inbox
+    - Multiple error groups with user impact tracked
+  - Service Map
+  - Transaction 360
+
+_Not an all-inclusive list, multiple other capabilities are present, but these are the ones the demo was specifically built for._
 
 Final Architecture
 ------------------
+
+In New Relic, you'll see the following 3 entities in APM:
+  - `$PROJECT_NAME-hop-service`
+  - `$PROJECT_NAME-lambda-function`
+  - `$PROJECT_NAME-webapp`
 
 ```mermaid
 graph LR;
@@ -144,6 +163,11 @@ Now, you will connect to the newly created EC2 instance to set up and run the fr
 4.  **Run the Docker Containers**: With the environment variables configured, start the services using Docker Compose. The `ubuntu` user has been added to the `docker` group, so `sudo` is not required.
     ```sh
     docker-compose up --build -d
+    ```
+
+5. **(Optional) View the Container Logs**: When the containers are running, you can watch all of their logs at once using Docker Compose.
+    ```sh
+    docker compose logs --follow
     ```
 
 ### Step 4: Access and Use the Application
