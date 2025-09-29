@@ -2,7 +2,6 @@ from flask import Flask, render_template, jsonify, request # type: ignore
 import logging
 import os
 import requests # type: ignore
-import uuid
 import newrelic.agent # type: ignore
 
 # Configure logging
@@ -35,11 +34,6 @@ def invoke_lambda():
     """Invokes the backend Lambda function via the hop service."""
     logging.info("Received request to invoke Lambda.")
     try:
-        # Generate a random user ID to help errors inbox show impacted users
-        user_id = str(uuid.uuid4())
-        newrelic.agent.set_user_id(user_id)
-        logging.info(f"User ID for this transaction: {user_id}")
-
         action_data = request.get_json()
         logging.info(f"Action data received: {action_data}")
         headers = {'Content-Type': 'application/json'}

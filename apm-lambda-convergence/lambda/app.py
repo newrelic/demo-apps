@@ -4,6 +4,7 @@ import platform
 import random
 import time
 import urllib3 # type: ignore
+import uuid
 import newrelic.agent # type: ignore
 
 # Configure logging for Lambda
@@ -113,7 +114,11 @@ def handler(event, context):
     logger.info(f"Request received: {event}")
 
     try:
-        # Step 1: Evaluate JSON from the request body.
+        # Generate a random user ID to help errors inbox show impacted users
+        user_id = str(uuid.uuid4())
+        newrelic.agent.set_user_id(user_id)
+        logging.info(f"User ID for this transaction: {user_id}")
+
         # This will raise a json.JSONDecodeError if the payload is malformed.
         body_str = event.get('body') or '{}'
         body = json.loads(body_str)
