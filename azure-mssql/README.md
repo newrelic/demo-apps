@@ -136,7 +136,7 @@ After the VM is deployed, you must manually run a script on the host to add the 
     tail -f /var/log/startup-script.log
     ```
 
-32.  **Run the script.** The script is located in the `/opt/adventureworks` directory. You must pass it the SQL password you defined in `terraform.tfvars`.
+3.  **Run the script.** The script is located in the `/opt/adventureworks` directory. You must pass it the SQL password you defined in `terraform.tfvars`. . 
 
     ```
     MSSQL_SA_PASSWORD=PASSWORD_GOES_HERE /opt/adventureworks/run_stored_procedures.sh
