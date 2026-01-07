@@ -1,0 +1,7 @@
+Flask==3.0.0
+gunicorn==21.2.0
+requests==2.32.5
+pandas==2.3.3
+Flask-Session==0.5.0
+newrelic==11.2.0
+python-dotenv==1.0.0

@@ -1,0 +1,70 @@
+<div class="sidebar-header">
+    <h1>🤖 AI Monitoring Demo</h1>
+</div>
+
+<!-- Mode Selector -->
+<div class="mode-selector">
+    <a href="{{ url_for('repair.repair_mode') }}"
+       class="mode-btn {% if current_mode == 'repair' %}active{% endif %}">
+        🔧 Repair System
+    </a>
+    <a href="{{ url_for('chat.chat_mode') }}"
+       class="mode-btn {% if current_mode == 'chat' %}active{% endif %}">
+        💬 Chat Assistant
+    </a>
+    <a href="{{ url_for('comparison.comparison_dashboard') }}"
+       class="mode-btn {% if current_mode == 'comparison' %}active{% endif %}">
+        📊 Model Comparison
+    </a>
+</div>
+
+<!-- System Info (auto-updates) -->
+<div class="sidebar-section">
+    <h3>System Info</h3>
+    <div id="agent-status">
+        <div class="status-loading">⏳ Loading...</div>
+    </div>
+</div>
+
+<!-- Model Info -->
+<div class="sidebar-section">
+    <h3>Models</h3>
+    <div class="model-card">
+        <strong>Model A (llama3.2:1b)</strong>
+        <p>Fast & Reliable</p>
+        <small>~0.5-1s response</small>
+    </div>
+    <div class="model-card">
+        <strong>Model B (qwen2.5:0.5b)</strong>
+        <p>Ultra Lightweight</p>
+        <small>~0.3-0.5s response</small>
+    </div>
+</div>
+
+<!-- Quick Stats (auto-updates) -->
+<div class="sidebar-section">
+    <div id="quick-stats">
+        <h3>Quick Stats</h3>
+        <div class="stat">Loading...</div>
+    </div>
+</div>
+
+<!-- Load Testing Panel -->
+{% include 'components/load_test_panel.html' %}
+
+<!-- Resources -->
+<div class="sidebar-section">
+    <h3>Resources</h3>
+    <ul class="resource-links">
+        <li><a href="{{ config.AGENT_URL }}" target="_blank">Agent API</a></li>
+        <li><a href="{{ config.MCP_URL }}" target="_blank">MCP Server</a></li>
+        <li><a href="http://localhost:8089" target="_blank">Locust UI</a></li>
+        <li><a href="http://localhost:8000" target="_blank">Target App</a></li>
+    </ul>
+</div>
+
+<!-- Footer -->
+<div class="sidebar-footer">
+    <p>🔬 Built for New Relic</p>
+    <p>AI Monitoring Demo</p>
+</div>

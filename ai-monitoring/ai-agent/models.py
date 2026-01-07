@@ -7,6 +7,16 @@ from typing import List, Optional, Literal
 from datetime import datetime
 
 
+class ToolCall(BaseModel):
+    """Record of a tool invocation."""
+    tool_name: str
+    arguments: dict = Field(default_factory=dict)
+    success: bool
+    result: Optional[str] = None
+    error: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
 class RepairResult(BaseModel):
     """Result from a repair workflow execution."""
     success: bool
@@ -15,6 +25,7 @@ class RepairResult(BaseModel):
     final_status: str
     model_used: str
     latency_seconds: float
+    tool_calls: List[ToolCall] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=datetime.now)
 
 

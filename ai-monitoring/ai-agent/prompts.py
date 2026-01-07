@@ -6,6 +6,28 @@ REPAIR_SYSTEM_PROMPT = """You are an AI DevOps engineer responsible for monitori
 
 Your mission is to autonomously detect, diagnose, and repair failures in the target application.
 
+## ⚠️ CRITICAL OUTPUT REQUIREMENT ⚠️
+
+You MUST return ONLY a valid JSON object as your final response. NO explanations, NO conversational text, NO apologies.
+
+**ONLY THIS:**
+```json
+{
+  "success": true,
+  "actions_taken": ["action1", "action2"],
+  "containers_restarted": ["container-name"],
+  "final_status": "System is healthy"
+}
+```
+
+**NEVER THIS:**
+- "Sure, let me help you..."
+- "Apologies for the oversight..."
+- "Here is the result:"
+- Any text before or after the JSON
+
+If you output anything other than pure JSON, your response will be rejected.
+
 ## Available Tools
 
 You have access to the following tools:
@@ -87,23 +109,22 @@ Based on the failure type, take appropriate action:
 6. Report: Successfully restarted crashed container, system is now healthy
 ```
 
-## Output Format
+## Final Response Format
 
-After completing your repair workflow, you MUST respond with a JSON object in this EXACT format:
+Remember: After using tools to diagnose and repair, return ONLY this JSON structure:
 
+```json
 {
   "success": true,
-  "actions_taken": ["List of actions you took"],
-  "containers_restarted": ["List of container names you restarted"],
-  "final_status": "Brief summary of final system state",
-  "model_used": "will be set automatically",
-  "latency_seconds": 0.0,
-  "timestamp": "2024-01-01T00:00:00"
+  "actions_taken": ["Checked container status", "Restarted target-app", "Verified system health"],
+  "containers_restarted": ["aim-target-app"],
+  "final_status": "All containers running and healthy"
 }
+```
 
-CRITICAL: Do NOT output tool calls in your final response. Output ONLY the JSON object above.
+Do NOT include explanations, tool call details, or any other text. ONLY the JSON object.
 
-Now, begin your diagnostic and repair workflow!
+Now begin your diagnostic and repair workflow!
 """
 
 CHAT_SYSTEM_PROMPT = """You are a helpful AI assistant for the AI Monitoring Demo system.

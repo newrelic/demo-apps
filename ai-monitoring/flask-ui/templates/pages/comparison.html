@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}Model Comparison - AI Monitoring Demo{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/comparison.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="comparison-container">
+    <h1>📊 Model Comparison Dashboard</h1>
+    <p>Compare performance of Model A (llama3.2:1b) vs Model B (qwen2.5:0.5b)</p>
+
+    <button id="refresh-metrics-btn" class="btn btn-secondary">🔄 Refresh Metrics</button>
+
+    <!-- Overview Metrics -->
+    <section class="overview-metrics">
+        <div class="metric-card" id="model-a-requests">
+            <h3>Model A Total Requests</h3>
+            <div class="metric-value">0</div>
+        </div>
+        <div class="metric-card" id="model-a-success">
+            <h3>Model A Success Rate</h3>
+            <div class="metric-value">0%</div>
+        </div>
+        <div class="metric-card" id="model-b-requests">
+            <h3>Model B Total Requests</h3>
+            <div class="metric-value">0</div>
+        </div>
+        <div class="metric-card" id="model-b-success">
+            <h3>Model B Success Rate</h3>
+            <div class="metric-value">0%</div>
+        </div>
+    </section>
+
+    <!-- Detailed Comparison -->
+    <section class="detailed-comparison">
+        <div class="comparison-column">
+            <h2>Model A (Fast & Reliable)</h2>
+            <div id="model-a-details">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+        <div class="comparison-column">
+            <h2>Model B (Ultra Lightweight)</h2>
+            <div id="model-b-details">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="charts-section">
+        <h2>⚡ Latency Comparison</h2>
+        <div id="latency-chart"></div>
+
+        <h2>✅ Success Rate Comparison</h2>
+        <div id="success-chart"></div>
+    </section>
+
+    <!-- Metrics Table -->
+    <section class="metrics-table-section">
+        <h2>📋 Metrics Table</h2>
+        <table id="comparison-table" class="metrics-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Model A</th>
+                    <th>Model B</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="3" class="loading">Loading...</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Insights -->
+    <section id="insights-section">
+        <h2>🎯 Insights</h2>
+        <div id="insights-content">
+            <div class="loading">Loading...</div>
+        </div>
+    </section>
+
+    <!-- Export -->
+    <section class="export-section">
+        <h2>📥 Export Data</h2>
+        <p>In production, this data would be exported to New Relic automatically.</p>
+        <button id="export-json-btn" class="btn btn-secondary">📊 Export to JSON</button>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/comparison.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,29 @@
+<div class="sidebar-section load-test-panel">
+    <h3>🔬 Load Testing</h3>
+    <p class="caption">Generate passive load for New Relic demo data</p>
+
+    <!-- Status Display -->
+    <div id="load-test-status">
+        <div class="status-loading">⏳ Checking...</div>
+    </div>
+
+    <!-- Start Configuration -->
+    <div class="load-test-config">
+        <h4>Start New Test:</h4>
+        <div class="form-group">
+            <label for="load-test-users">Users (1-50):</label>
+            <input type="number" id="load-test-users" value="10" min="1" max="50">
+        </div>
+        <div class="form-group">
+            <label for="load-test-duration">Duration (min):</label>
+            <input type="number" id="load-test-duration" value="30" min="1" max="120">
+        </div>
+        <button id="start-load-test-btn" class="btn btn-primary">🚀 Start Load Test</button>
+    </div>
+
+    <!-- Control Buttons -->
+    <div class="load-test-controls">
+        <button id="check-load-test-btn" class="btn btn-secondary">📊 Check Status</button>
+        <button id="stop-load-test-btn" class="btn btn-danger" style="display: none;">⏹️ Stop Test</button>
+    </div>
+</div>

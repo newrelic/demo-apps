@@ -14,7 +14,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider
 
 from prompts import REPAIR_SYSTEM_PROMPT, CHAT_SYSTEM_PROMPT
-from models import RepairResult, ModelMetrics
+from models import RepairResult, ModelMetrics, ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ repair_agent_a = Agent(
     model_a,
     system_prompt=REPAIR_SYSTEM_PROMPT,
     output_type=RepairResult,
-    retries=3,  # Allow 3 retries for output validation with small models
+    retries=5,  # Increased retries for small model JSON formatting issues
     tool_timeout=120.0,  # 120 second timeout for individual tool calls
 )
 
@@ -97,7 +97,7 @@ repair_agent_b = Agent(
     model_b,
     system_prompt=REPAIR_SYSTEM_PROMPT,
     output_type=RepairResult,
-    retries=3,  # Allow 3 retries for output validation with small models
+    retries=5,  # Increased retries for small model JSON formatting issues
     tool_timeout=120.0,  # 120 second timeout for individual tool calls
 )
 
@@ -263,6 +263,29 @@ async def run_repair_workflow(model: Literal["a", "b"] = "a") -> RepairResult:
         result.output.model_used = model_name
         result.output.latency_seconds = latency
 
+        # Extract tool calls from the result
+        tool_calls = []
+        for message in result.all_messages():
+            if hasattr(message, 'parts'):
+                for part in message.parts:
+                    if hasattr(part, 'tool_name'):
+                        # This is a tool call
+                        tool_call = ToolCall(
+                            tool_name=part.tool_name,
+                            arguments=part.args if hasattr(part, 'args') else {},
+                            success=True,  # We'll mark as success if it executed
+                            result="Tool executed successfully"
+                        )
+                        tool_calls.append(tool_call)
+                    elif hasattr(part, 'content') and isinstance(part.content, str):
+                        # Check if this is a tool return message
+                        if 'tool_return' in str(type(part)).lower():
+                            # Update the last tool call with result
+                            if tool_calls:
+                                tool_calls[-1].result = part.content[:200]  # Limit result length
+
+        result.output.tool_calls = tool_calls
+
         # Update metrics
         metrics.total_requests += 1
         metrics.successful_requests += 1
@@ -271,7 +294,7 @@ async def run_repair_workflow(model: Literal["a", "b"] = "a") -> RepairResult:
             / metrics.total_requests
         )
 
-        logger.info(f"Repair workflow completed in {latency:.2f}s")
+        logger.info(f"Repair workflow completed in {latency:.2f}s with {len(tool_calls)} tool calls")
         return result.output
 
     except Exception as e:

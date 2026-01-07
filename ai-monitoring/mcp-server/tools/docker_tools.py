@@ -7,6 +7,7 @@ import json
 import logging
 import docker
 from typing import Optional
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,43 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize Docker client: {e}")
     docker_client = None
+
+
+def get_relative_time(timestamp_str: str) -> str:
+    """
+    Convert ISO timestamp to relative time string (e.g., '2 minutes ago').
+
+    Args:
+        timestamp_str: ISO 8601 timestamp string
+
+    Returns:
+        Human-readable relative time string
+    """
+    try:
+        # Parse the timestamp (Docker returns ISO 8601 format)
+        if timestamp_str.endswith('Z'):
+            timestamp_str = timestamp_str[:-1] + '+00:00'
+
+        container_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
+        delta = now - container_time
+
+        seconds = int(delta.total_seconds())
+
+        if seconds < 60:
+            return f"{seconds} seconds ago"
+        elif seconds < 3600:
+            minutes = seconds // 60
+            return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+        elif seconds < 86400:
+            hours = seconds // 3600
+            return f"{hours} hour{'s' if hours != 1 else ''} ago"
+        else:
+            days = seconds // 86400
+            return f"{days} day{'s' if days != 1 else ''} ago"
+    except Exception as e:
+        logger.warning(f"Failed to parse timestamp: {e}")
+        return "unknown"
 
 
 def docker_ps() -> str:
@@ -30,6 +68,8 @@ def docker_ps() -> str:
         - image: Container image
         - id: Short container ID
         - health: Health status if available
+        - started_at: ISO timestamp when container started
+        - uptime: Human-readable uptime (e.g., "2 minutes ago")
     """
     try:
         if docker_client is None:
@@ -43,12 +83,19 @@ def docker_ps() -> str:
             if container.attrs.get('State', {}).get('Health'):
                 health_status = container.attrs['State']['Health'].get('Status')
 
+            # Get start time from State
+            state = container.attrs.get('State', {})
+            started_at = state.get('StartedAt', '')
+            uptime = get_relative_time(started_at) if started_at else 'unknown'
+
             result.append({
                 "name": container.name,
                 "status": container.status,
                 "image": container.image.tags[0] if container.image.tags else "unknown",
                 "id": container.short_id,
-                "health": health_status
+                "health": health_status,
+                "started_at": started_at,
+                "uptime": uptime
             })
 
         logger.info(f"Listed {len(result)} containers")
@@ -106,10 +153,22 @@ def restart_container(service_name: str) -> str:
             return "Error: Docker client not initialized"
 
         container = docker_client.containers.get(service_name)
+
+        # Log pre-restart state
+        old_state = container.attrs.get('State', {})
+        old_started_at = old_state.get('StartedAt', 'unknown')
+        logger.info(f"Restarting container '{service_name}' (previously started: {old_started_at})")
+
         container.restart(timeout=10)
 
-        logger.info(f"Successfully restarted container '{service_name}'")
-        return f"✓ Successfully restarted container '{service_name}'"
+        # Reload container to get new state
+        container.reload()
+        new_state = container.attrs.get('State', {})
+        new_started_at = new_state.get('StartedAt', 'unknown')
+
+        logger.info(f"✓ Successfully restarted container '{service_name}' (new start time: {new_started_at})")
+        return (f"✓ Successfully restarted container '{service_name}'\n"
+                f"New start time: {get_relative_time(new_started_at)}")
 
     except docker.errors.NotFound:
         error_msg = f"Container '{service_name}' not found"

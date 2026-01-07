@@ -143,22 +143,24 @@ services:
       - aim-network
     restart: unless-stopped
 
-  # Streamlit UI - Web interface with repair, chat, and model comparison
-  streamlit-ui:
+  # Flask UI - Web interface with repair, chat, and model comparison
+  # Features: Server-side rendering, AJAX polling, Plotly.js charts, Flask sessions
+  # New Relic: Automatic browser monitoring via APM agent (WSGI)
+  flask-ui:
     build:
-      context: ./streamlit-ui
+      context: ./flask-ui
       dockerfile: Dockerfile
-    container_name: aim-streamlit-ui
+    container_name: aim-flask-ui
     ports:
       - "8501:8501"
     environment:
       - AGENT_URL=${AGENT_URL}
       - MCP_URL=${MCP_URL}
-      - STREAMLIT_SERVER_PORT=${STREAMLIT_SERVER_PORT}
-      - STREAMLIT_SERVER_ADDRESS=${STREAMLIT_SERVER_ADDRESS}
+      - SECRET_KEY=${FLASK_SECRET_KEY}
       # New Relic
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
-      - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME_STREAMLIT_UI}
+      - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME_FLASK_UI}
+      - NEW_RELIC_CONFIG_FILE=/app/newrelic.ini
     depends_on:
       ai-agent:
         condition: service_healthy
