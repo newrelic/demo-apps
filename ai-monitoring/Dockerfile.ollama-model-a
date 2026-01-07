@@ -1,0 +1,14 @@
+FROM ollama/ollama:latest
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Pre-download the llama3.2:1b model during build
+RUN ollama serve & \
+    sleep 5 && \
+    ollama pull llama3.2:1b && \
+    pkill ollama
+
+# Default command to serve
+# Note: Base image has ENTRYPOINT ["/bin/ollama"], so CMD just needs the subcommand
+CMD ["serve"]

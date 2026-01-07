@@ -60,7 +60,7 @@ def docker_logs(service_name: str, lines: int = 50) -> str:
     Read recent logs from a specific container.
 
     Args:
-        service_name: Name of the container (e.g., 'ai-monitoring-target-app')
+        service_name: Name of the container (e.g., 'aim-target-app')
         lines: Number of log lines to retrieve (default: 50)
 
     Use this tool to diagnose issues by examining container logs.

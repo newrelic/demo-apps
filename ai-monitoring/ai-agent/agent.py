@@ -10,7 +10,8 @@ import time
 import httpx
 from typing import Literal
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.ollama import OllamaModel
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.ollama import OllamaProvider
 
 from prompts import REPAIR_SYSTEM_PROMPT, CHAT_SYSTEM_PROMPT
 from models import RepairResult, ModelMetrics
@@ -21,10 +22,10 @@ logger = logging.getLogger(__name__)
 MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://mcp-server:8002")
 
 # Model configurations
-OLLAMA_MODEL_A_URL = os.getenv("OLLAMA_MODEL_A_URL", "http://ollama-model-a:11434")
-OLLAMA_MODEL_B_URL = os.getenv("OLLAMA_MODEL_B_URL", "http://ollama-model-b:11434")
-MODEL_A_NAME = os.getenv("MODEL_A_NAME", "llama3.2:3b")
-MODEL_B_NAME = os.getenv("MODEL_B_NAME", "llama3.3:7b")
+OLLAMA_MODEL_A_URL = os.getenv("OLLAMA_MODEL_A_URL", "http://ollama-model-a:11434/v1")
+OLLAMA_MODEL_B_URL = os.getenv("OLLAMA_MODEL_B_URL", "http://ollama-model-b:11434/v1")
+MODEL_A_NAME = os.getenv("MODEL_A_NAME", "llama3.2:1b")
+MODEL_B_NAME = os.getenv("MODEL_B_NAME", "qwen2.5:0.5b")
 
 # HTTP client for MCP server
 mcp_client = httpx.Client(base_url=MCP_SERVER_URL, timeout=60.0)
@@ -65,33 +66,39 @@ def call_mcp_tool(tool_path: str, method: str = "GET", data: dict = None) -> str
         return f"Error calling tool: {str(e)}"
 
 
-# ===== Create Model Instances =====
+# ===== Model Instantiation =====
 
-# Model A - Fast baseline (Llama 3.2 3B)
-model_a = OllamaModel(
+# We explicitly create OllamaModel instances to avoid "Unknown model" inference errors.
+# Note: PydanticAI's OllamaModel expects the /v1 suffix for the OpenAI-compatible endpoint.
+model_a = OpenAIChatModel(
     model_name=MODEL_A_NAME,
-    base_url=OLLAMA_MODEL_A_URL
+    provider=OllamaProvider(base_url=OLLAMA_MODEL_A_URL)
 )
 
-# Model B - Premium comparison (Llama 3.3 7B)
-model_b = OllamaModel(
+model_b = OpenAIChatModel(
     model_name=MODEL_B_NAME,
-    base_url=OLLAMA_MODEL_B_URL
+    provider=OllamaProvider(base_url=OLLAMA_MODEL_B_URL)
 )
 
 
 # ===== Repair Agent =====
 
+# Model A - Fast baseline
 repair_agent_a = Agent(
-    model=model_a,
+    model_a,
     system_prompt=REPAIR_SYSTEM_PROMPT,
-    result_type=RepairResult,
+    output_type=RepairResult,
+    retries=3,  # Allow 3 retries for output validation with small models
+    tool_timeout=120.0,  # 120 second timeout for individual tool calls
 )
 
+# Model B - Premium comparison
 repair_agent_b = Agent(
-    model=model_b,
+    model_b,
     system_prompt=REPAIR_SYSTEM_PROMPT,
-    result_type=RepairResult,
+    output_type=RepairResult,
+    retries=3,  # Allow 3 retries for output validation with small models
+    tool_timeout=120.0,  # 120 second timeout for individual tool calls
 )
 
 
@@ -206,15 +213,15 @@ async def locust_stop_test(ctx: RunContext) -> str:
     return call_mcp_tool("/tools/locust_stop_test")
 
 
-# ===== Chat Agents (without structured output) =====
+# ===== Chat Agents =====
 
 chat_agent_a = Agent(
-    model=model_a,
+    model_a,
     system_prompt=CHAT_SYSTEM_PROMPT,
 )
 
 chat_agent_b = Agent(
-    model=model_b,
+    model_b,
     system_prompt=CHAT_SYSTEM_PROMPT,
 )
 
@@ -253,8 +260,8 @@ async def run_repair_workflow(model: Literal["a", "b"] = "a") -> RepairResult:
         )
 
         latency = time.time() - start_time
-        result.data.model_used = model_name
-        result.data.latency_seconds = latency
+        result.output.model_used = model_name
+        result.output.latency_seconds = latency
 
         # Update metrics
         metrics.total_requests += 1
@@ -265,7 +272,7 @@ async def run_repair_workflow(model: Literal["a", "b"] = "a") -> RepairResult:
         )
 
         logger.info(f"Repair workflow completed in {latency:.2f}s")
-        return result.data
+        return result.output
 
     except Exception as e:
         logger.error(f"Repair workflow failed: {e}", exc_info=True)
@@ -312,7 +319,7 @@ async def run_chat(message: str, model: Literal["a", "b"] = "a") -> tuple[str, f
         )
 
         logger.info(f"Chat completed in {latency:.2f}s")
-        return result.data, latency
+        return result.output, latency
 
     except Exception as e:
         logger.error(f"Chat failed: {e}", exc_info=True)

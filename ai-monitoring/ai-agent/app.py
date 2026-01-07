@@ -292,8 +292,8 @@ async def root():
         "version": "1.0.0",
         "description": "Autonomous AI agent for system monitoring and repair",
         "models": {
-            "a": os.getenv("MODEL_A_NAME", "llama3.2:3b"),
-            "b": os.getenv("MODEL_B_NAME", "llama3.3:7b")
+            "a": os.getenv("MODEL_A_NAME", "llama3.2:1b"),
+            "b": os.getenv("MODEL_B_NAME", "qwen2.5:0.5b")
         },
         "endpoints": {
             "repair": "POST /repair?model={a|b}",

@@ -28,7 +28,7 @@ def render_chat_mode(agent_client: AgentClient):
     # Model selection
     model_option = st.selectbox(
         "Select Model",
-        ["Model A (Llama 3.2 3B)", "Model B (Llama 3.3 7B)", "Compare Both"],
+        ["Model A (llama3.2:1b)", "Model B (qwen2.5:0.5b)", "Compare Both"],
         help="Choose which model to chat with"
     )
 

@@ -1,4 +1,5 @@
-streamlit==1.29.0
-requests==2.31.0
-plotly==5.18.0
-pandas==2.1.4
+streamlit~=1.52.2
+requests~=2.32.5
+plotly~=6.5.0
+pandas~=2.3.3
+newrelic~=11.2.0

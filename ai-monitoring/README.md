@@ -26,7 +26,7 @@ The system consists of 8 Docker services:
          v
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
 │   AI Agent      │◄────►│  Ollama Model A │      │  Ollama Model B │
-│  (PydanticAI)   │      │ (Llama 3.2 3B)  │      │ (Llama 3.3 7B)  │
+│  (PydanticAI)   │      │ (llama3.2:1b)   │      │ (qwen2.5:0.5b)  │
 │  (Port 8001)    │      │  (Port 11434)   │      │  (Port 11435)   │
 │  - Model Router │      └─────────────────┘      └─────────────────┘
 │  - A/B Logic    │
@@ -58,8 +58,8 @@ The system consists of 8 Docker services:
 |---------|------------|------|---------|
 | **Streamlit UI** | Streamlit | 8501 | Web interface with 3 modes |
 | **AI Agent** | PydanticAI + FastAPI | 8001 | Reasoning engine with model routing |
-| **Ollama Model A** | Ollama (Llama 3.2 3B) | 11434 | Fast baseline model |
-| **Ollama Model B** | Ollama (Llama 3.3 7B) | 11435 | Premium comparison model |
+| **Ollama Model A** | Ollama (llama3.2:1b) | 11434 | Fast & Reliable model |
+| **Ollama Model B** | Ollama (qwen2.5:0.5b) | 11435 | Ultra Lightweight model |
 | **MCP Server** | FastMCP + FastAPI | 8002 | Tool interface for Docker/Locust |
 | **Target App** | FastAPI | 8000 | Fragile service with failure modes |
 | **Chaos Engine** | Python | - | Random failure injection |
@@ -68,9 +68,20 @@ The system consists of 8 Docker services:
 ## 📋 Prerequisites
 
 ### System Requirements
-- **RAM**: Minimum 12GB (4GB for Model A + 8GB for Model B + 4GB for services)
-- **Disk**: ~20GB free space for Docker images and Ollama models
-- **CPU**: Multi-core recommended (models run sequentially)
+- **RAM**: Minimum 4-6GB Docker memory (8GB+ recommended)
+  - Model A (llama3.2:1b): ~1.5-2GB
+  - Model B (qwen2.5:0.5b): ~500MB-1GB
+  - Other services: ~1-2GB
+  - **Total Required**: 4-6GB Docker memory minimum (8GB+ recommended for comfortable operation)
+- **Disk**: ~7GB free space required:
+  - **Ollama Model A image**: ~2GB (llama3.2:1b model baked in)
+  - **Ollama Model B image**: ~1.5GB (qwen2.5:0.5b model baked in)
+  - **Application service images**: ~2GB combined (target-app, ai-agent, mcp-server, chaos-engine, locust, streamlit-ui)
+  - **Docker volumes**: ~500MB (ollama-data-a, ollama-data-b, failure-state)
+  - **Container logs**: ~200-500MB (varies with usage)
+  - **Build cache**: ~1GB (intermediate layers during builds)
+  - **Recommended**: 10-12GB free space for comfortable operation with headroom
+- **CPU**: Multi-core recommended (models run sequentially but benefit from multiple cores)
 
 ### Software Requirements
 - Docker Desktop or Docker Engine 20.10+
@@ -89,34 +100,43 @@ The system consists of 8 Docker services:
 cd ai-monitoring
 ```
 
-### 2. Copy Environment Variables
+### 2. Configure Environment Variables
 ```bash
+# Copy the example file
 cp .env.example .env
+
+# Edit .env and add your New Relic license key
+# Required: Set NEW_RELIC_LICENSE_KEY=your_license_key_here
+# Optional: Customize app names if desired
 ```
 
-### 3. Start the Stack
+**Get your New Relic license key**: [New Relic License Keys](https://one.newrelic.com/launcher/api-keys-ui.api-keys-launcher)
+
+### 3. Build All Images
+Build all services including the lightweight Ollama models:
+```bash
+docker-compose build --no-cache
+```
+
+This will build all 8 services (~4-5 minutes):
+- Ollama Model A with llama3.2:1b (~1.3GB)
+- Ollama Model B with qwen2.5:0.5b (~350MB)
+- AI Agent (PydanticAI + New Relic instrumentation)
+- MCP Server (FastMCP + Docker tools)
+- Streamlit UI (Web interface + Browser monitoring)
+- Target App, Chaos Engine, and Locust
+
+**Note**: This step only needs to be done once. Subsequent starts use cached images.
+
+### 4. Start the Stack
 ```bash
 docker-compose up -d
 ```
 
-This will:
-- Pull all necessary Docker images
-- Download Ollama models (~5-10 minutes on first run)
-- Start all 8 services
-- Set up networking and volumes
-
-### 4. Monitor Startup
-Watch the logs to see when models are ready:
-```bash
-docker-compose logs -f ollama-model-a ollama-model-b
-```
-
-Look for messages like:
-- "Model A ready"
-- "Model B ready"
+All 8 services will start and be ready within 30-60 seconds.
 
 ### 5. Access the UI
-Once models are loaded, open your browser:
+Open your browser to:
 ```
 http://localhost:8501
 ```
@@ -130,8 +150,8 @@ http://localhost:8501
 **How to Use**:
 1. Navigate to "🔧 Repair System" in the sidebar
 2. Select a model:
-   - **Model A**: Fast repairs (~1-2s latency)
-   - **Model B**: More accurate repairs (~3-5s latency)
+   - **Model A (llama3.2:1b)**: Fast & Reliable (~0.5-1s latency)
+   - **Model B (qwen2.5:0.5b)**: Ultra Lightweight (~0.3-0.5s latency)
    - **Compare Both**: Run both models and see side-by-side results
 3. Click "🚀 Run Repair System"
 4. Watch the agent:
@@ -208,101 +228,13 @@ The agent should maintain boundaries while remaining helpful.
 
 ## 🔧 Troubleshooting
 
-### Models Not Loading
+For detailed troubleshooting steps, common issues, and disk space management, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
 
-**Symptom**: UI shows "Agent: Offline" or repairs timeout
-
-**Solution**:
-```bash
-# Check Ollama logs
-docker-compose logs ollama-model-a
-docker-compose logs ollama-model-b
-
-# Verify models downloaded
-docker exec ai-monitoring-ollama-model-a ollama list
-docker exec ai-monitoring-ollama-model-b ollama list
-
-# Restart if needed
-docker-compose restart ollama-model-a ollama-model-b
-```
-
-### Container Crashes
-
-**Symptom**: Service keeps restarting
-
-**Solution**:
-```bash
-# Check logs for specific service
-docker logs ai-monitoring-target-app
-
-# Check all services
-docker-compose ps
-
-# Restart entire stack
-docker-compose down && docker-compose up -d
-```
-
-### Permission Errors
-
-**Symptom**: "Permission denied" for Docker socket
-
-**Solution**:
-```bash
-# Linux: Add user to docker group
-sudo usermod -aG docker $USER
-newgrp docker
-
-# macOS: Ensure Docker Desktop is running
-```
-
-### Out of Memory
-
-**Symptom**: Services getting killed (OOM)
-
-**Solution**:
-```bash
-# Check Docker resources in Docker Desktop
-# Increase memory allocation to at least 12GB
-
-# Or reduce model sizes in docker-compose.yml
-# Change llama3.3:7b to llama3.2:3b for Model B
-```
-
-### Agent Not Responding
-
-**Symptom**: Repair requests hang or timeout
-
-**Solution**:
-```bash
-# Check agent health
-curl http://localhost:8001/health
-
-# Verify MCP server
-curl http://localhost:8002/health
-
-# Check Ollama models
-curl http://localhost:11434/api/tags
-curl http://localhost:11435/api/tags
-
-# Restart agent
-docker-compose restart ai-agent
-```
-
-### Chaos Engine Too Aggressive
-
-**Symptom**: System keeps failing before repairs complete
-
-**Solution**:
-```bash
-# Edit .env file
-CHAOS_INTERVAL=300  # Increase to 5 minutes
-
-# Or disable temporarily
-CHAOS_ENABLED=false
-
-# Restart chaos engine
-docker-compose restart chaos-engine
-```
+**Quick Links**:
+- [Models Not Loading](./TROUBLESHOOTING.md#models-not-loading)
+- [Memory Errors](./TROUBLESHOOTING.md#ollama-model-memory-errors-most-common)
+- [Build Failures](./TROUBLESHOOTING.md#build-failures)
+- [Cleanup & Disk Space](./TROUBLESHOOTING.md#cleanup--disk-space-management)
 
 ## 🧪 Failure Scenarios
 
@@ -314,7 +246,7 @@ The demo includes 3 types of failures:
 - **Expected Repair**: Agent restarts the container
 - **Test Manually**:
   ```bash
-  docker stop ai-monitoring-target-app
+  docker stop aim-target-app
   ```
 
 ### 2. Slow Response / Timeout
@@ -343,10 +275,10 @@ The demo includes 3 types of failures:
 
 ### What to Compare
 
-- **Speed**: Model A (3B) is typically 2-3x faster
-- **Accuracy**: Model B (7B) may handle edge cases better
-- **Cost**: Smaller models are more cost-effective
-- **Use Case Fit**: Choose model based on requirements
+- **Speed**: Both models are fast, Model B (0.5b) may be slightly faster due to smaller size
+- **Accuracy**: Model A (1b) handles complex scenarios better with more parameters
+- **Size**: Model B is ultra-lightweight (~350MB), ideal for edge/resource-constrained deployment
+- **Use Case Fit**: Model A for reliability and accuracy, Model B for speed and minimal resource usage
 
 ### New Relic Integration
 
@@ -356,47 +288,56 @@ When instrumented, this data maps to New Relic's model comparison features:
 - Quality scores and hallucination detection
 - Automated recommendations
 
-## 📊 Observability Hooks
+## 📊 New Relic Instrumentation
 
-### Current Logging
+### Current Implementation
 
-All services use structured JSON logging:
-- Container logs via Docker
-- Request/response logging in FastAPI services
-- Agent reasoning traces
-- Tool invocations with parameters
+All three Python services are instrumented with **New Relic Python Agent 11.2.0**:
 
-### Future New Relic Instrumentation
+**Instrumented Services**:
+- **ai-agent** (aim-demo_ai-agent)
+- **mcp-server** (aim-demo_mcp-server)
+- **streamlit-ui** (aim-demo_streamlit-ui)
 
-**Add to requirements.txt**:
+**Configuration Method**: `.ini` files with ConfigParser variable substitution (`%(VAR)s`)
+
+**Features Enabled**:
+- ✅ **Distributed Tracing** (W3C trace context propagation across all services)
+- ✅ **AI Monitoring** (LLM call tracking, token counting, model performance)
+- ✅ **Browser Monitoring** (Real User Monitoring for Streamlit UI)
+- ✅ **Transaction Tracing** (detailed performance breakdown)
+- ✅ **Error Collection** (exception tracking and analysis)
+
+**Trace Flow**:
 ```
-newrelic
-```
-
-**Wrap Agent Calls** (ai-agent/agent.py):
-```python
-import newrelic.agent
-
-@newrelic.agent.background_task()
-async def run_repair_workflow(model):
-    with newrelic.agent.LlmTokenCountCallback() as callback:
-        result = await agent.run(...)
-        callback.set_token_count(prompt=tokens_in, completion=tokens_out)
-    return result
-```
-
-**Instrument MCP Tools** (mcp-server/server.py):
-```python
-@newrelic.agent.function_trace()
-@app.post("/tools/docker_restart")
-async def docker_restart(...):
-    ...
+Browser (RUM)
+  ↓
+streamlit-ui (Python agent + requests)
+  ↓
+ai-agent (Python agent + httpx)
+  ↓
+mcp-server (Python agent + Docker API)
 ```
 
-**Environment Variables**:
+**View in New Relic**:
+1. Navigate to **APM → aim-demo_streamlit-ui → Distributed Tracing**
+2. Trigger a repair workflow from the UI
+3. See full end-to-end trace across all four tiers (Browser → Streamlit → AI Agent → MCP Server)
+
+**AI Monitoring Data Captured**:
+- LLM model performance comparison (llama3.2:1b vs qwen2.5:0.5b)
+- Tool call success rates (docker_ps, docker_restart, docker_logs, etc.)
+- Response latency by model
+- Token usage and costs
+- Hallucination detection patterns
+- A/B testing metrics
+
+**Environment Variables** (.env file):
 ```bash
-NEW_RELIC_LICENSE_KEY=your_key_here
-NEW_RELIC_APP_NAME=ai-monitoring-demo
+NEW_RELIC_LICENSE_KEY=your_license_key
+NEW_RELIC_APP_NAME_AI_AGENT=aim-demo_ai-agent
+NEW_RELIC_APP_NAME_MCP_SERVER=aim-demo_mcp-server
+NEW_RELIC_APP_NAME_STREAMLIT_UI=aim-demo_streamlit-ui
 ```
 
 ## 🛠️ Development
@@ -404,15 +345,17 @@ NEW_RELIC_APP_NAME=ai-monitoring-demo
 ### Project Structure
 ```
 ai-monitoring/
-├── docker-compose.yml       # Orchestration
-├── .env.example             # Configuration template
-├── README.md                # This file
-├── streamlit-ui/            # Web interface
-├── ai-agent/                # PydanticAI agent
-├── mcp-server/              # Tool server
-├── target-app/              # Fragile service
-├── chaos-engine/            # Failure injection
-└── locust-tests/            # Load testing
+├── docker-compose.yml          # Orchestration
+├── Dockerfile.ollama-model-a   # Pre-built Ollama image for Model A
+├── Dockerfile.ollama-model-b   # Pre-built Ollama image for Model B
+├── .env.example                # Configuration template
+├── README.md                   # This file
+├── streamlit-ui/               # Web interface
+├── ai-agent/                   # PydanticAI agent
+├── mcp-server/                 # Tool server
+├── target-app/                 # Fragile service
+├── chaos-engine/               # Failure injection
+└── locust-tests/               # Load testing
 ```
 
 ### Making Changes
@@ -423,6 +366,12 @@ docker-compose build <service-name>
 docker-compose up -d <service-name>
 ```
 
+**Rebuild Ollama Images** (if models change):
+```bash
+docker-compose build ollama-model-a ollama-model-b
+docker-compose up -d ollama-model-a ollama-model-b
+```
+
 **View Logs**:
 ```bash
 docker-compose logs -f <service-name>
@@ -430,7 +379,7 @@ docker-compose logs -f <service-name>
 
 **Access Container Shell**:
 ```bash
-docker exec -it ai-monitoring-<service-name> /bin/bash
+docker exec -it aim-<service-name> /bin/bash
 ```
 
 ### Useful Commands
@@ -451,10 +400,11 @@ docker-compose logs -f
 # Check status
 docker-compose ps
 
-# Clean up everything
+# Clean up
 docker-compose down -v
-docker system prune -a
 ```
+
+For detailed cleanup and disk space management strategies, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md#cleanup--disk-space-management).
 
 ## 🎓 Learning Resources
 
@@ -471,10 +421,11 @@ docker system prune -a
 
 ## 🐛 Known Issues
 
-1. **First Startup Slow**: Model downloads take 5-10 minutes
-2. **Memory Usage**: Full stack requires 12GB+ RAM
+1. **First Build Takes Time**: Initial image build takes 4-5 minutes to build all services (one-time only)
+2. **Memory Usage**: Requires 4-6GB Docker memory allocation minimum (8GB+ recommended)
 3. **Docker Socket**: Requires privileged access on some systems
 4. **Port Conflicts**: Ensure ports 8000, 8001, 8002, 8089, 8501, 11434, 11435 are available
+5. **Model "signal: killed"**: If you see this error, your Docker memory is too low - see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md#ollama-model-memory-errors-most-common)
 
 ## 🤝 Contributing
 

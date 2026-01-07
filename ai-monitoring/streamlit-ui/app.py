@@ -64,13 +64,13 @@ with st.sidebar:
     # Model information
     st.subheader("Models")
 
-    st.caption("**Model A (Fast)**")
-    st.text("Llama 3.2 3B")
-    st.caption("~1-2s response time")
+    st.caption("**Model A (llama3.2:1b - Fast & Reliable)**")
+    st.text("Meta's small model")
+    st.caption("~0.5-1s response time")
 
-    st.caption("**Model B (Accurate)**")
-    st.text("Llama 3.3 7B")
-    st.caption("~3-5s response time")
+    st.caption("**Model B (qwen2.5:0.5b - Ultra Lightweight)**")
+    st.text("Alibaba's tiny model")
+    st.caption("~0.3-0.5s response time")
 
     st.markdown("---")
 
@@ -84,6 +84,91 @@ with st.sidebar:
         st.subheader("Quick Stats")
         st.metric("Model A Requests", model_a_total)
         st.metric("Model B Requests", model_b_total)
+
+    st.markdown("---")
+
+    # Load Testing section
+    with st.expander("🔬 Load Testing", expanded=False):
+        st.caption("Generate passive load for New Relic demo data")
+
+        # Check current status
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📊 Check Status", use_container_width=True):
+                with st.spinner("Checking..."):
+                    stats = mcp_client.get_load_test_stats()
+                    st.session_state['load_test_stats'] = stats
+
+        with col2:
+            if st.button("🔄 Refresh", use_container_width=True):
+                st.rerun()
+
+        # Display current status
+        if 'load_test_stats' in st.session_state:
+            stats = st.session_state['load_test_stats']
+
+            if "error" in stats:
+                st.error(f"⚠️ {stats['error']}")
+            else:
+                status = stats.get("status", "unknown")
+
+                if status == "running":
+                    st.success("✅ Load test running")
+
+                    metric_col1, metric_col2 = st.columns(2)
+                    with metric_col1:
+                        st.metric("Requests", stats.get("total_requests", 0))
+                        st.metric("Users", stats.get("user_count", 0))
+
+                    with metric_col2:
+                        avg_time = stats.get("avg_response_time", 0)
+                        st.metric("Avg Time", f"{avg_time:.0f}ms")
+                        rps = stats.get("requests_per_second", 0)
+                        st.metric("RPS", f"{rps:.1f}")
+
+                    st.caption("ℹ️ ~10% error rate expected (error-causing prompts)")
+
+                    # Stop button
+                    if st.button("⏹️ Stop Test", use_container_width=True, type="secondary"):
+                        with st.spinner("Stopping..."):
+                            result = mcp_client.stop_load_test()
+                            if "error" in result:
+                                st.error(f"❌ {result['error']}")
+                            else:
+                                st.success("Stopped successfully")
+                                del st.session_state['load_test_stats']
+                                st.rerun()
+
+                elif status == "stopped":
+                    st.info("⏸️ No test running")
+                else:
+                    st.warning(f"Status: {status}")
+
+        st.markdown("---")
+        st.markdown("**Start New Test:**")
+
+        # Configuration
+        config_col1, config_col2 = st.columns(2)
+        with config_col1:
+            users = st.number_input("Users", min_value=1, max_value=50, value=10, help="Concurrent users")
+        with config_col2:
+            duration_min = st.number_input("Duration (min)", min_value=1, max_value=120, value=30, help="Test duration")
+
+        # Start button
+        if st.button("🚀 Start Load Test", use_container_width=True, type="primary"):
+            with st.spinner(f"Starting {users} users for {duration_min}min..."):
+                result = mcp_client.start_load_test(
+                    users=users,
+                    spawn_rate=2,
+                    duration=duration_min * 60
+                )
+
+                if "error" in result:
+                    st.error(f"❌ {result['error']}")
+                else:
+                    st.success(f"✅ Started: {users} users, {duration_min}min")
+                    st.info("💡 View details at http://localhost:8089")
+                    st.rerun()
 
     st.markdown("---")
 

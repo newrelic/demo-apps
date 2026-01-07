@@ -14,6 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Set New Relic configuration file location
+ENV NEW_RELIC_CONFIG_FILE=/app/newrelic.ini
+
 # Expose MCP server port
 EXPOSE 8002
 
@@ -21,5 +24,5 @@ EXPOSE 8002
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
     CMD curl -f http://localhost:8002/health || exit 1
 
-# Run the MCP server
-CMD ["python", "server.py"]
+# Run the MCP server with New Relic instrumentation
+CMD ["newrelic-admin", "run-program", "python", "server.py"]

@@ -29,7 +29,7 @@ Follow this systematic approach to diagnose and repair issues:
 **STEP 1: DETECT**
 - Always start by calling docker_ps() to check the health of all containers
 - Look for containers with status: "exited", "restarting", or "unhealthy"
-- Focus on the "ai-monitoring-target-app" container
+- Focus on the "aim-target-app" container
 
 **STEP 2: DIAGNOSE**
 - Use docker_logs(service_name, 100) to read logs and understand WHY the failure occurred
@@ -43,7 +43,7 @@ Follow this systematic approach to diagnose and repair issues:
 Based on the failure type, take appropriate action:
 
 - **Crash Scenario**:
-  - Call docker_restart("ai-monitoring-target-app")
+  - Call docker_restart("aim-target-app")
   - Wait a moment for restart to complete
   - Check docker_ps() again to verify container is running
 
@@ -53,10 +53,10 @@ Based on the failure type, take appropriate action:
   - May just need to wait, or restart if persistent
 
 - **Config Error Scenario**:
-  - Call docker_inspect("ai-monitoring-target-app") to see environment variables
+  - Call docker_inspect("aim-target-app") to see environment variables
   - Identify the missing or invalid variable (usually DATABASE_URL)
-  - Call docker_update_env("ai-monitoring-target-app", "DATABASE_URL", "postgresql://user:pass@fake-db:5432/app")
-  - Call docker_restart("ai-monitoring-target-app") to apply the fix
+  - Call docker_update_env("aim-target-app", "DATABASE_URL", "postgresql://user:pass@fake-db:5432/app")
+  - Call docker_restart("aim-target-app") to apply the fix
 
 **STEP 4: VERIFY**
 - After repairs, call docker_ps() to confirm the container is healthy
@@ -80,12 +80,28 @@ Based on the failure type, take appropriate action:
 
 ```
 1. Call docker_ps() → Notice target-app is "exited"
-2. Call docker_logs("ai-monitoring-target-app", 100) → See "CRASH FAILURE MODE ACTIVATED"
+2. Call docker_logs("aim-target-app", 100) → See "CRASH FAILURE MODE ACTIVATED"
 3. Diagnose: Container crashed due to chaos injection
-4. Call docker_restart("ai-monitoring-target-app")
+4. Call docker_restart("aim-target-app")
 5. Call docker_ps() → Verify target-app is now "running" and "healthy"
 6. Report: Successfully restarted crashed container, system is now healthy
 ```
+
+## Output Format
+
+After completing your repair workflow, you MUST respond with a JSON object in this EXACT format:
+
+{
+  "success": true,
+  "actions_taken": ["List of actions you took"],
+  "containers_restarted": ["List of container names you restarted"],
+  "final_status": "Brief summary of final system state",
+  "model_used": "will be set automatically",
+  "latency_seconds": 0.0,
+  "timestamp": "2024-01-01T00:00:00"
+}
+
+CRITICAL: Do NOT output tool calls in your final response. Output ONLY the JSON object above.
 
 Now, begin your diagnostic and repair workflow!
 """

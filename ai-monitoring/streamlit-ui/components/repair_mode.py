@@ -33,7 +33,7 @@ def render_repair_mode(agent_client: AgentClient, mcp_client: MCPClient):
 
     model_option = st.selectbox(
         "Select Model",
-        ["Model A (Llama 3.2 3B - Fast)", "Model B (Llama 3.3 7B - Accurate)", "Compare Both"],
+        ["Model A (llama3.2:1b - Fast & Reliable)", "Model B (qwen2.5:0.5b - Ultra Lightweight)", "Compare Both"],
         help="Choose which model to use for the repair workflow"
     )
 
@@ -80,7 +80,7 @@ def render_repair_mode(agent_client: AgentClient, mcp_client: MCPClient):
                         status_color = "⚪"
 
                     st.metric(
-                        label=name.replace("ai-monitoring-", ""),
+                        label=name.replace("aim-", ""),
                         value=status,
                         delta=None
                     )
@@ -219,12 +219,12 @@ def render_repair_mode(agent_client: AgentClient, mcp_client: MCPClient):
     container_name = st.selectbox(
         "Select Container",
         [
-            "ai-monitoring-target-app",
-            "ai-monitoring-chaos-engine",
-            "ai-monitoring-mcp-server",
-            "ai-monitoring-ai-agent",
-            "ai-monitoring-ollama-model-a",
-            "ai-monitoring-ollama-model-b"
+            "aim-target-app",
+            "aim-chaos-engine",
+            "aim-mcp-server",
+            "aim-ai-agent",
+            "aim-ollama-model-a",
+            "aim-ollama-model-b"
         ]
     )
 

@@ -1,0 +1,14 @@
+FROM ollama/ollama:latest
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Pre-download the qwen2.5:0.5b model during build (ultra lightweight)
+RUN ollama serve & \
+    sleep 5 && \
+    ollama pull qwen2.5:0.5b && \
+    pkill ollama
+
+# Default command to serve
+# Note: Base image has ENTRYPOINT ["/bin/ollama"], so CMD just needs the subcommand
+CMD ["serve"]

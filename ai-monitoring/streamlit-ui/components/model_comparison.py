@@ -20,7 +20,7 @@ def render_model_comparison(agent_client: AgentClient):
     st.title("📊 Model Comparison Dashboard")
 
     st.markdown("""
-    Compare the performance of Model A (Llama 3.2 3B) vs Model B (Llama 3.3 7B).
+    Compare the performance of Model A (llama3.2:1b) vs Model B (qwen2.5:0.5b).
     This dashboard showcases New Relic's model comparison capabilities.
     """)
 
@@ -77,7 +77,7 @@ def render_model_comparison(agent_client: AgentClient):
     comp_col1, comp_col2 = st.columns(2)
 
     with comp_col1:
-        st.markdown("### Model A (Fast Baseline)")
+        st.markdown("### Model A (Fast & Reliable)")
         st.markdown(f"**Model:** {model_a_metrics.get('name', 'N/A')}")
 
         st.metric("Total Requests", model_a_metrics.get("total_requests", 0))
@@ -86,7 +86,7 @@ def render_model_comparison(agent_client: AgentClient):
         st.metric("Avg Latency", f"{model_a_metrics.get('avg_latency_seconds', 0):.2f}s")
 
     with comp_col2:
-        st.markdown("### Model B (Premium)")
+        st.markdown("### Model B (Ultra Lightweight)")
         st.markdown(f"**Model:** {model_b_metrics.get('name', 'N/A')}")
 
         st.metric("Total Requests", model_b_metrics.get("total_requests", 0))
