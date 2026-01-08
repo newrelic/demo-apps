@@ -83,55 +83,6 @@ class PollingManager {
 const polling = new PollingManager();
 console.log('[Main] PollingManager initialized');
 
-// Sidebar auto-update (agent health, quick stats)
-async function updateSidebar() {
-    console.log('[Main] Updating sidebar data');
-    // Update agent status
-    const healthData = await api.get('/api/health');
-    const statusEl = document.getElementById('agent-status');
-
-    if (statusEl) {
-        if (healthData.error) {
-            console.warn('[Main] Agent health check failed:', healthData.error);
-            statusEl.innerHTML = '<div class="status-error">❌ Agent: Offline</div>';
-        } else {
-            const hours = Math.floor(healthData.uptime_seconds / 3600);
-            const minutes = Math.floor((healthData.uptime_seconds % 3600) / 60);
-            console.log(`[Main] Agent status: Online (uptime: ${hours}h ${minutes}m)`);
-            statusEl.innerHTML = `
-                <div class="status-success">✅ Agent: Online</div>
-                <div class="status-uptime">Uptime: ${hours}h ${minutes}m</div>
-            `;
-        }
-    }
-
-    // Update quick stats
-    const metricsData = await api.get('/api/metrics');
-    const statsEl = document.getElementById('quick-stats');
-
-    if (statsEl && !metricsData.error) {
-        console.log('[Main] Quick stats updated:', {
-            modelA: metricsData.model_a.total_requests,
-            modelB: metricsData.model_b.total_requests
-        });
-        statsEl.innerHTML = `
-            <h3>Quick Stats</h3>
-            <div class="stat">Model A: ${metricsData.model_a.total_requests} requests</div>
-            <div class="stat">Model B: ${metricsData.model_b.total_requests} requests</div>
-        `;
-    } else if (metricsData.error) {
-        console.warn('[Main] Failed to fetch metrics:', metricsData.error);
-    }
-}
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('[Main] DOM loaded, initializing application');
-    // Start sidebar polling (every 30 seconds)
-    polling.start('sidebar', updateSidebar, 30000);
-    console.log('[Main] Sidebar polling started (30s interval)');
-});
-
 // Clean up on page unload
 window.addEventListener('beforeunload', () => {
     console.log('[Main] Page unloading, cleaning up polling intervals');

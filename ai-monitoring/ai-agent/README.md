@@ -1,12 +1,12 @@
-# AI Agent - Autonomous System Repair Engine
+# AI Agent - Autonomous Tool Execution Agent
 
-Autonomous reasoning engine powered by PydanticAI that diagnoses and repairs system failures using LLM-based tool calling and A/B model comparison.
+Autonomous reasoning engine powered by PydanticAI that executes multi-step system operations using LLM-based tool calling and A/B model comparison.
 
 ## Features
 
-- **Autonomous Repair Workflows**: Automatically detects failures, diagnoses issues, and takes corrective actions
+- **Autonomous Tool Workflows**: Executes multi-step system operations through intelligent tool orchestration
 - **Dual Model Support**: A/B testing with two LLM models (mistral:7b-instruct and ministral-3:8b-instruct-2512-q8_0)
-- **MCP Tool Calling**: Integrates with MCP server for Docker container management and load testing
+- **MCP Tool Calling**: Integrates with MCP server for generic system operation tools
 - **Metrics Collection**: Tracks performance metrics for model comparison
 - **Chat Interface**: Interactive chat with system prompts and tool integration
 - **New Relic Instrumentation**: Full APM monitoring with distributed tracing
@@ -29,7 +29,7 @@ ai-agent/
 ├── app.py               # FastAPI application and endpoints
 ├── agent.py             # PydanticAI agent implementation
 ├── models.py            # Pydantic models for requests/responses
-├── prompts.py           # System prompts for repair and chat modes
+├── prompts.py           # System prompts for tool execution and chat modes
 ├── requirements.txt     # Python dependencies
 ├── Dockerfile           # Container configuration
 └── newrelic.ini         # New Relic APM configuration
@@ -40,16 +40,16 @@ ai-agent/
 ```
 Flask UI          AI Agent         Model Router      Ollama A/B       MCP Server
    |                 |                 |                 |                 |
-   |--POST /repair-->|                 |                 |                 |
+   |--POST /tools--->|                 |                 |                 |
    |                 |--select_model()->|                 |                 |
    |                 |                 |--generate()---->|                 |
    |                 |                 |<--response------|                 |
-   |                 |--call_tool()----|-----------------|--docker_ps()--->|
-   |                 |                 |                 |<--containers----|
-   |                 |--generate()-----|--diagnose------>|                 |
+   |                 |--call_tool()----|-----------------|--system_health->|
+   |                 |                 |                 |<--status--------|
+   |                 |--generate()-----|--analyze------->|                 |
    |                 |                 |<--action_plan---|                 |
-   |                 |--call_tool()----|-----------------|--docker_restart>|
-   |<--RepairResult--|                 |                 |                 |
+   |                 |--call_tool()----|-----------------|--service_restart|
+   |<--ToolResult----|                 |                 |                 |
 ```
 
 **Key Components**:
@@ -64,7 +64,7 @@ Flask UI          AI Agent         Model Router      Ollama A/B       MCP Server
 ### Endpoints
 
 #### `POST /repair?model={a|b}`
-Trigger repair workflow with specified model.
+Trigger tool execution workflow with specified model.
 
 **Query Parameters**:
 - `model` (required): `"a"` for mistral:7b-instruct or `"b"` for ministral-3:8b-instruct-2512-q8_0
@@ -75,18 +75,20 @@ Trigger repair workflow with specified model.
   "success": true,
   "model": "mistral:7b-instruct",
   "latency_seconds": 2.45,
-  "reasoning": "Detected target-app container crashed...",
+  "reasoning": "Detected api-gateway service degraded...",
   "actions_taken": [
-    "Restarted target-app container",
+    "Checked system health status",
+    "Retrieved service logs",
+    "Restarted api-gateway service",
     "Verified service health"
   ],
   "final_status": "healthy",
-  "containers_restarted": ["target-app"]
+  "tools_used": ["check_system_health", "get_service_logs", "restart_service"]
 }
 ```
 
 #### `POST /repair/compare`
-Run repair workflow with both models and compare results.
+Run tool execution workflow with both models and compare results.
 
 **Response**:
 ```json
@@ -219,13 +221,13 @@ INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
 # Test agent health
 curl http://localhost:8001/status
 
-# Test repair workflow
+# Test tool execution workflow
 curl -X POST "http://localhost:8001/repair?model=a"
 
 # Test chat
 curl -X POST http://localhost:8001/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "What containers are running?", "model": "a"}'
+  -d '{"message": "What is the system status?", "model": "a"}'
 
 # Test metrics
 curl http://localhost:8001/metrics
@@ -250,13 +252,13 @@ curl http://localhost:8001/metrics
 
 System prompts are defined in `prompts.py`:
 
-- **REPAIR_SYSTEM_PROMPT**: Instructions for autonomous repair workflow
+- **REPAIR_SYSTEM_PROMPT**: Instructions for autonomous tool execution workflow
 - **CHAT_SYSTEM_PROMPT**: Instructions for interactive chat mode
 
 Both prompts include:
 - Available MCP tools and their usage
-- Expected workflow (check → diagnose → fix → verify)
-- Constraints (no destructive actions, prefer restart over deletion)
+- Expected workflow (check → diagnose → execute → verify)
+- Constraints (safe operations, prefer graceful actions)
 
 ## Troubleshooting
 
@@ -264,7 +266,7 @@ Both prompts include:
 
 #### Agent Not Responding
 
-**Symptom**: Repair requests hang or timeout
+**Symptom**: Tool execution requests hang or timeout
 
 **Diagnosis**:
 ```bash
@@ -310,7 +312,7 @@ docker-compose restart ollama-model-a ollama-model-b
 
 #### MCP Tool Call Failures
 
-**Symptom**: Repair workflow fails with "Tool call failed" error
+**Symptom**: Tool execution workflow fails with "Tool call failed" error
 
 **Diagnosis**:
 ```bash
@@ -403,8 +405,8 @@ docker logs aim-ai-agent | grep -i newrelic
    ```python
    import asyncio
    results = await asyncio.gather(
-       call_tool("docker_ps"),
-       call_tool("docker_logs", {"service": "target-app"})
+       call_tool("check_system_health"),
+       call_tool("get_service_logs", {"service": "api-gateway"})
    )
    ```
 
@@ -414,7 +416,7 @@ docker logs aim-ai-agent | grep -i newrelic
    ```python
    import newrelic.agent
 
-   newrelic.agent.record_custom_event('AIRepairWorkflow', {
+   newrelic.agent.record_custom_event('AIToolWorkflow', {
        'model': model_name,
        'success': result.success,
        'latency_seconds': result.latency_seconds
@@ -424,7 +426,7 @@ docker logs aim-ai-agent | grep -i newrelic
 2. **Error Tracking**: Log all exceptions with context
    ```python
    import logging
-   logger.error(f"Repair failed: {e}", extra={'model': model, 'user_id': user_id})
+   logger.error(f"Tool execution failed: {e}", extra={'model': model, 'user_id': user_id})
    ```
 
 3. **Health Checks**: Implement comprehensive health check
@@ -443,20 +445,20 @@ docker logs aim-ai-agent | grep -i newrelic
    - Stateless design supports load balancing
    - Consider external metrics storage (Redis, PostgreSQL)
 
-2. **Queue-Based Repairs**: Use message queue for repair requests
+2. **Queue-Based Workflows**: Use message queue for tool execution requests
    ```python
-   # Add Celery or RabbitMQ for async repair processing
+   # Add Celery or RabbitMQ for async workflow processing
    from celery import Celery
    app = Celery('ai-agent')
 
    @app.task
-   def async_repair(model: str):
+   def async_tool_workflow(model: str):
        ...
    ```
 
 3. **Model Selection Strategy**: Implement intelligent model routing
-   - Route simple repairs to faster Model B
-   - Route complex repairs to more accurate Model A
+   - Route simple tasks to faster Model B
+   - Route complex tasks to more accurate Model A
    - Use past performance metrics for routing decisions
 
 ## License

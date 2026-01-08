@@ -4,9 +4,9 @@ Load generation suite using Locust that creates background telemetry by simulati
 
 ## Features
 
-- **Flask UI Traffic Generation**: Simulates users accessing chat and repair pages
+- **Flask UI Traffic Generation**: Simulates users accessing chat and tool execution pages
 - **A/B Model Comparison**: 50/50 split traffic between Model A and Model B
-- **Repair Workflow Testing**: Automated repair triggers with performance tracking
+- **Tool Workflow Testing**: Automated tool execution triggers with performance tracking
 - **Chat Interface Load**: Simulates user chat interactions with both models
 - **Passive Load Generation**: Background telemetry generation with weighted prompt distribution
 - **Web UI**: Real-time metrics dashboard on port 8089
@@ -36,17 +36,17 @@ locust-tests/
 │                      Locust Load Generator                   │
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │  TargetAppUser (Business Traffic)                      │ │
-│  │  • wait_time: between(1, 3)                            │ │
-│  │  • Tasks: health(3), orders(2), products(2), ...      │ │
+│  │  FlaskUIUser (Web Interface Traffic)                   │ │
+│  │  • wait_time: between(2, 5)                            │ │
+│  │  • Tasks: home, tools page, chat page                  │ │
 │  └────────────────┬───────────────────────────────────────┘ │
 │                   │                                          │
-│                   └──> http://target-app:8000/               │
+│                   └──> http://flask-ui:8501/                 │
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │  ModelAUser (AI Agent - Model A)                       │ │
 │  │  • wait_time: constant_pacing(30)                      │ │
-│  │  • Repair trigger: 20% probability                     │ │
+│  │  • Tool execution: 20% probability                     │ │
 │  └────────────────┬───────────────────────────────────────┘ │
 │                   │                                          │
 │                   └──> http://ai-agent:8001/repair?model=a  │
@@ -54,7 +54,7 @@ locust-tests/
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │  ModelBUser (AI Agent - Model B)                       │ │
 │  │  • wait_time: constant_pacing(30)                      │ │
-│  │  • Repair trigger: 20% probability                     │ │
+│  │  • Tool execution: 20% probability                     │ │
 │  └────────────────┬───────────────────────────────────────┘ │
 │                   │                                          │
 │                   └──> http://ai-agent:8001/repair?model=b  │
@@ -75,60 +75,34 @@ locust-tests/
 
 **Key Components**:
 
-1. **TargetAppUser**: Simulates standard application traffic
-2. **ModelAUser/ModelBUser**: A/B split for agent repair workflows (50/50)
+1. **FlaskUIUser**: Simulates browser traffic to web interface
+2. **ModelAUser/ModelBUser**: A/B split for agent tool execution workflows (50/50)
 3. **ChatModelAUser/ChatModelBUser**: Chat interface load testing
 4. **PassiveLoadUser**: New Relic demo data generation with prompt variety
 5. **Locust Web UI**: Real-time statistics and control interface
 
 ## User Classes Reference
 
-### 1. TargetAppUser - Business Traffic
+### 1. ModelAUser - AI Agent Tool Execution (Model A)
 
-**Purpose**: Simulate realistic business traffic to the target application
-
-**Configuration**:
-- **Host**: `http://target-app:8000`
-- **Wait Time**: `between(1, 3)` seconds (random between tasks)
-- **Task Distribution**:
-  - `get_health()` - Weight: 3 (most frequent)
-  - `get_orders()` - Weight: 2
-  - `get_products()` - Weight: 2
-  - `create_order()` - Weight: 1 (POST /orders)
-  - `get_specific_product()` - Weight: 1 (GET /products/:id)
-
-**Traffic Pattern**:
-```
-3 health checks
-2 order fetches
-2 product browses
-1 order creation
-1 specific product lookup
-= 9 total requests per cycle (1-3s between cycles)
-```
-
-**Use Case**: Load testing target-app under normal conditions, detecting failures
-
-### 2. ModelAUser - AI Agent Repair (Model A)
-
-**Purpose**: Test AI agent repair workflows using Model A (mistral:7b-instruct)
+**Purpose**: Test AI agent tool execution workflows using Model A (mistral:7b-instruct)
 
 **Configuration**:
 - **Host**: `http://ai-agent:8001`
 - **Wait Time**: `constant_pacing(30)` (runs every 30 seconds)
-- **Repair Trigger Probability**: 20%
+- **Tool Trigger Probability**: 20%
 
 **Workflow**:
 1. Check agent status: `GET /status`
-2. 20% chance: Trigger repair: `POST /repair?model=a` (timeout: 120s)
-3. Validate repair success in response JSON
+2. 20% chance: Trigger tool workflow: `POST /repair?model=a` (timeout: 120s)
+3. Validate workflow success in response JSON
 4. Wait 30 seconds, repeat
 
 **Use Case**: A/B testing for Model A performance metrics
 
-### 3. ModelBUser - AI Agent Repair (Model B)
+### 2. ModelBUser - AI Agent Tool Execution (Model B)
 
-**Purpose**: Test AI agent repair workflows using Model B (ministral-3:8b-instruct-2512-q8_0)
+**Purpose**: Test AI agent tool execution workflows using Model B (ministral-3:8b-instruct-2512-q8_0)
 
 **Configuration**:
 - **Host**: `http://ai-agent:8001`

@@ -124,8 +124,8 @@ services:
       - aim-network
     restart: unless-stopped
 
-  # Flask UI - Web interface with repair, chat, and model comparison
-  # Features: Server-side rendering, AJAX polling, Plotly.js charts, Flask sessions
+  # Flask UI - Web interface for tool execution and chat pages
+  # Features: Server-side rendering, AJAX polling, Flask sessions
   # New Relic: Automatic browser monitoring via APM agent (WSGI)
   flask-ui:
     build:

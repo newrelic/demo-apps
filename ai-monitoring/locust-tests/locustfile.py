@@ -2,8 +2,9 @@
 Locust load tests with A/B model comparison.
 
 This file defines load testing scenarios including:
-1. Standard target-app traffic simulation
+1. Flask UI traffic simulation
 2. A/B testing for Model A vs Model B agent performance
+3. Chat interface load testing
 """
 
 import os
@@ -11,52 +12,12 @@ import random
 from locust import HttpUser, task, between, constant_pacing
 
 # Configuration
-TARGET_APP_URL = os.getenv("TARGET_APP_URL", "http://target-app:8000")
 AI_AGENT_URL = os.getenv("AI_AGENT_URL", "http://ai-agent:8001")
+FLASK_UI_URL = os.getenv("FLASK_UI_URL", "http://flask-ui:8501")
 
 
-class TargetAppUser(HttpUser):
-    """
-    Base user class that simulates traffic to the target application.
-
-    This represents normal business traffic hitting the application endpoints.
-    """
-    host = TARGET_APP_URL
-    wait_time = between(1, 3)  # Wait 1-3 seconds between tasks
-
-    @task(3)
-    def get_health(self):
-        """Check health endpoint (most frequent)."""
-        self.client.get("/health", name="GET /health")
-
-    @task(2)
-    def get_orders(self):
-        """Fetch all orders."""
-        self.client.get("/orders", name="GET /orders")
-
-    @task(2)
-    def get_products(self):
-        """Browse product catalog."""
-        self.client.get("/products", name="GET /products")
-
-    @task(1)
-    def create_order(self):
-        """Create a new order."""
-        products = ["Widget", "Gadget", "Doohickey", "Thingamajig"]
-        product = random.choice(products)
-        amount = round(random.uniform(10.0, 500.0), 2)
-
-        self.client.post(
-            "/orders",
-            json={"product": product, "amount": amount},
-            name="POST /orders"
-        )
-
-    @task(1)
-    def get_specific_product(self):
-        """Get a specific product by ID."""
-        product_id = random.randint(1, 5)
-        self.client.get(f"/products/{product_id}", name="GET /products/:id")
+# NOTE: TargetAppUser class removed - target-app service no longer exists in current architecture
+# Current architecture focuses on Flask UI and AI Agent services
 
 
 class ModelAUser(HttpUser):
@@ -216,20 +177,20 @@ class ChatModelBUser(HttpUser):
 # Tool-invoking prompts (40%) - trigger MCP tool usage
 TOOL_PROMPTS = [
     "Check the current system status and tell me if there are any issues",
-    "What containers are running right now?",
-    "Can you check the logs for the aim-target-app?",
-    "Run diagnostics on all containers",
-    "Are there any failed containers?",
-    "Inspect the health of the target application",
-    "Show me the docker container status",
-    "Check if the aim-target-app needs to be restarted",
+    "What services are running right now?",
+    "Can you check the logs for the api-gateway service?",
+    "Run diagnostics on all services",
+    "Are there any failed services?",
+    "Inspect the health of the authentication service",
+    "Show me the system status",
+    "Check if the database service needs to be restarted",
     "What's the health status of all services?",
     "Investigate why the system might be slow",
-    "List all running containers with their status",
-    "Check the aim-ai-agent container logs",
-    "What's wrong with the target app?",
+    "List all running services with their status",
+    "Check the auth-service logs",
+    "What's wrong with the api-gateway?",
     "Diagnose any failures in the system",
-    "Show me container health checks",
+    "Show me the service health checks",
 ]
 
 # Simple conversational prompts (50%) - no tool usage
@@ -331,13 +292,13 @@ class PassiveLoadUser(HttpUser):
 # ===== Usage Notes =====
 #
 # To run with all user classes (A/B split):
-#   locust -f locustfile.py --host http://target-app:8000
-#
-# To run only target app traffic:
-#   locust -f locustfile.py --host http://target-app:8000 TargetAppUser
+#   locust -f locustfile.py --host http://ai-agent:8001
 #
 # To run only Model A traffic:
 #   locust -f locustfile.py --host http://ai-agent:8001 ModelAUser
+#
+# To run only Model B traffic:
+#   locust -f locustfile.py --host http://ai-agent:8001 ModelBUser
 #
 # To run passive load for demo data generation:
 #   locust -f locustfile.py --host http://ai-agent:8001 PassiveLoadUser --users 10 --run-time 30m

@@ -48,31 +48,6 @@ def get_container_logs(container_name):
     return jsonify(mcp_client.get_container_logs(container_name, lines))
 
 
-@bp.route('/load-test/status')
-def load_test_status():
-    """Current load test statistics (polled every 5s)."""
-    mcp_client = get_mcp_client()
-    return jsonify(mcp_client.get_load_test_stats())
-
-
-@bp.route('/load-test/start', methods=['POST'])
-def start_load_test():
-    """Start load test."""
-    mcp_client = get_mcp_client()
-    data = request.get_json()
-    users = data.get('users', 10)
-    spawn_rate = data.get('spawn_rate', 2)
-    duration = data.get('duration', 1800)
-    return jsonify(mcp_client.start_load_test(users, spawn_rate, duration))
-
-
-@bp.route('/load-test/stop', methods=['POST'])
-def stop_load_test():
-    """Stop load test."""
-    mcp_client = get_mcp_client()
-    return jsonify(mcp_client.stop_load_test())
-
-
 @bp.route('/agent/minimal-repair', methods=['POST'])
 def agent_minimal_repair():
     """Trigger minimal repair workflow (debugging endpoint)."""

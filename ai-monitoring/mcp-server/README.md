@@ -80,10 +80,10 @@ List all Docker containers with their status.
 [
   {
     "id": "abc123...",
-    "name": "aim-target-app",
+    "name": "aim-ai-agent",
     "status": "running",
-    "image": "aim-target-app:latest",
-    "ports": {"8000/tcp": [{"HostPort": "8000"}]}
+    "image": "aim-ai-agent:latest",
+    "ports": {"8001/tcp": [{"HostPort": "8001"}]}
   },
   ...
 ]
@@ -93,7 +93,7 @@ List all Docker containers with their status.
 Read container logs.
 
 **Parameters**:
-- `service_name`: Container name (e.g., "target-app")
+- `service_name`: Container name (e.g., "api-gateway" or "auth-service")
 - `lines`: Number of log lines to return (default: 100)
 
 **Returns**: Log output as string
@@ -169,37 +169,32 @@ Stop the currently running load test.
 
 All MCP tools are also exposed as REST endpoints:
 
-- `POST /tools/docker_ps` - List containers
-- `POST /tools/docker_logs` - Get container logs (body: `{"service": "target-app", "lines": 100}`)
-- `POST /tools/docker_restart` - Restart container (body: `{"service": "target-app"}`)
-- `POST /tools/docker_inspect` - Inspect container (body: `{"service": "target-app"}`)
-- `POST /tools/docker_update_env` - Update env var (body: `{"service": "target-app", "key": "VAR", "value": "val"}`)
-- `POST /tools/locust_start` - Start load test (body: `{"users": 10, "spawn_rate": 2}`)
-- `POST /tools/locust_stats` - Get load test stats
-- `POST /tools/locust_stop` - Stop load test
+- `POST /tools/check_system_health` - Check overall system health
+- `POST /tools/get_service_logs` - Get service logs (body: `{"service": "api-gateway", "lines": 100}`)
+- `POST /tools/restart_service` - Restart service (body: `{"service": "auth-service"}`)
+- `POST /tools/check_database_status` - Check database connection and performance
+- `POST /tools/update_configuration` - Update service config (body: `{"service": "api-gateway", "key": "VAR", "value": "val"}`)
+- `POST /tools/run_diagnostics` - Run comprehensive system diagnostics
 - `GET /health` - Health check
 
 ## Dependencies
 
 ### Upstream Services
-None - MCP server controls other services
+None - MCP server provides generic system operation tools
 
 ### Downstream Services
 - **ai-agent** (Port 8001): Main consumer of MCP tools
 
 ### External Dependencies
-- **Docker Socket**: `/var/run/docker.sock` (mounted as volume, read-only recommended)
-- **Locust API**: Port 8089 (HTTP API for load test control)
-- **Failure State File**: `/tmp/failure_state.json` (shared with chaos-engine and target-app)
+None - All tools return mock data for demonstration purposes
 
 ## Local Development
 
 ### Prerequisites
 
 - Python 3.11+
-- Docker with accessible socket
-- Running Locust instance (for load testing tools)
-- Read/write access to `/var/run/docker.sock`
+- FastMCP framework
+- New Relic Python Agent (optional)
 
 ### Running Standalone
 
@@ -208,9 +203,9 @@ None - MCP server controls other services
 pip install -r requirements.txt
 
 # Set environment variables
-export DOCKER_HOST=unix:///var/run/docker.sock
-export LOCUST_URL=http://localhost:8089
 export MCP_PORT=8002
+export NEW_RELIC_LICENSE_KEY=your_license_key  # Optional
+export NEW_RELIC_APP_NAME=aim-demo_mcp-server  # Optional
 
 # Run service
 python server.py
@@ -230,25 +225,20 @@ INFO:     Uvicorn running on http://0.0.0.0:8002 (Press CTRL+C to quit)
 # Test health
 curl http://localhost:8002/health
 
-# Test Docker tools
-curl -X POST http://localhost:8002/tools/docker_ps
+# Test system operation tools
+curl -X POST http://localhost:8002/tools/check_system_health
 
-curl -X POST http://localhost:8002/tools/docker_logs \
+curl -X POST http://localhost:8002/tools/get_service_logs \
   -H "Content-Type: application/json" \
-  -d '{"service": "target-app", "lines": 50}'
+  -d '{"service": "api-gateway", "lines": 50}'
 
-curl -X POST http://localhost:8002/tools/docker_restart \
+curl -X POST http://localhost:8002/tools/restart_service \
   -H "Content-Type: application/json" \
-  -d '{"service": "target-app"}'
+  -d '{"service": "auth-service"}'
 
-# Test Locust tools
-curl -X POST http://localhost:8002/tools/locust_start \
-  -H "Content-Type: application/json" \
-  -d '{"users": 10, "spawn_rate": 2, "duration": 60}'
+curl -X POST http://localhost:8002/tools/check_database_status
 
-curl -X POST http://localhost:8002/tools/locust_stats
-
-curl -X POST http://localhost:8002/tools/locust_stop
+curl -X POST http://localhost:8002/tools/run_diagnostics
 ```
 
 ## Configuration
@@ -257,8 +247,6 @@ curl -X POST http://localhost:8002/tools/locust_stop
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DOCKER_HOST` | Yes | - | Docker socket path (unix:///var/run/docker.sock) |
-| `LOCUST_URL` | Yes | - | Locust API URL (http://locust:8089) |
 | `MCP_PORT` | No | 8002 | Port to run MCP server |
 | `NEW_RELIC_LICENSE_KEY` | No | - | New Relic ingest license key |
 | `NEW_RELIC_APP_NAME` | No | - | Application name for APM |

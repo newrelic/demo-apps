@@ -52,7 +52,7 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_globals():
         return {
-            'current_mode': session.get('current_mode', 'repair'),
+            'current_mode': session.get('current_mode', 'tools'),
             'config': app.config
         }
 
