@@ -14,7 +14,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 
-from agent import run_repair_workflow, run_chat, get_metrics, model_a_metrics, model_b_metrics
+from agent import (
+    run_repair_workflow,
+    run_minimal_repair_workflow,
+    run_minimal_repair_workflow_manual,
+    run_chat,
+    run_debug_test,
+    run_direct_llm_test,
+    get_metrics,
+    model_a_metrics,
+    model_b_metrics
+)
 from models import (
     RepairResult,
     ChatRequest,
@@ -29,6 +39,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Suppress uvicorn access logs (noisy from polling/health checks)
+logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
 
 # Track service start time
 start_time = time.time()
@@ -91,66 +104,81 @@ async def trigger_repair(model: Literal["a", "b"] = "a"):
     Returns:
         RepairResult with actions taken and outcome
     """
-    logger.info(f"Repair endpoint called with model={model}")
+    start_time = time.time()
+    logger.info(f"[REPAIR-ENDPOINT] Request received - model={model}, timestamp={start_time}")
 
     try:
+        if model == "a":
+            logger.info(f"[REPAIR-ENDPOINT] Executing repair with Model A")
+        elif model == "b":
+            logger.info(f"[REPAIR-ENDPOINT] Executing repair with Model B")
+
+        logger.info(f"[REPAIR-ENDPOINT] About to call run_repair_workflow(model={model})")
         result = await run_repair_workflow(model)
+        logger.info(f"[REPAIR-ENDPOINT] run_repair_workflow returned")
+
+        elapsed = time.time() - start_time
+        actions_count = len(result.get("actions_taken", [])) if isinstance(result, dict) else len(result.actions_taken)
+        logger.info(f"[REPAIR-ENDPOINT] Repair completed successfully - model={model}, elapsed={elapsed:.2f}s, actions={actions_count}")
+
         return result
 
     except Exception as e:
-        logger.error(f"Repair workflow failed: {e}", exc_info=True)
+        elapsed = time.time() - start_time
+        logger.error(f"[REPAIR-ENDPOINT] Repair failed - model={model}, elapsed={elapsed:.2f}s, error={str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Repair workflow failed: {str(e)}")
 
 
-@app.post("/repair/compare", response_model=ComparisonResult)
-async def compare_repairs():
+@app.post("/repair/minimal", response_model=RepairResult)
+async def trigger_minimal_repair(model: Literal["a", "b"] = "a"):
     """
-    Run repair workflow with both models and compare results.
+    Trigger a MINIMAL repair workflow (only 2 tools for debugging).
+
+    This is a simplified version with reduced context to test if the issue is compute-related.
+
+    Args:
+        model: Which model to use ("a" or "b")
 
     Returns:
-        ComparisonResult with side-by-side comparison
+        RepairResult with actions taken and outcome
     """
-    logger.info("Running repair comparison with both models")
+    logger.info(f"[MINIMAL-REPAIR] Request received - model={model}")
 
     try:
-        # Run both models in sequence
-        result_a = await run_repair_workflow("a")
-        result_b = await run_repair_workflow("b")
-
-        # Determine winner based on success and latency
-        winner = None
-        reason = ""
-
-        if result_a.success and not result_b.success:
-            winner = "a"
-            reason = "Model A succeeded while Model B failed"
-        elif result_b.success and not result_a.success:
-            winner = "b"
-            reason = "Model B succeeded while Model A failed"
-        elif result_a.success and result_b.success:
-            if result_a.latency_seconds < result_b.latency_seconds:
-                winner = "a"
-                reason = f"Both succeeded, but Model A was faster ({result_a.latency_seconds:.2f}s vs {result_b.latency_seconds:.2f}s)"
-            elif result_b.latency_seconds < result_a.latency_seconds:
-                winner = "b"
-                reason = f"Both succeeded, but Model B was faster ({result_b.latency_seconds:.2f}s vs {result_a.latency_seconds:.2f}s)"
-            else:
-                winner = "tie"
-                reason = "Both models performed equally"
-        else:
-            winner = "tie"
-            reason = "Both models failed"
-
-        return ComparisonResult(
-            model_a_result=result_a,
-            model_b_result=result_b,
-            winner=winner,
-            reason=reason
-        )
+        result = await run_minimal_repair_workflow(model)
+        logger.info(f"[MINIMAL-REPAIR] Completed - success={result.success}")
+        return result
 
     except Exception as e:
-        logger.error(f"Comparison failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Comparison failed: {str(e)}")
+        logger.error(f"[MINIMAL-REPAIR] Failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Minimal repair failed: {str(e)}")
+
+
+@app.post("/repair/manual", response_model=RepairResult)
+async def trigger_manual_repair(model: Literal["a", "b"] = "a"):
+    """
+    Trigger a MANUAL repair workflow (bypasses PydanticAI).
+
+    This directly calls Ollama, parses tool calls from text, executes them,
+    and feeds results back. Works around Ollama's lack of function calling support.
+
+    Args:
+        model: Which model to use ("a" or "b")
+
+    Returns:
+        RepairResult with actions taken and outcome
+    """
+    logger.info(f"[MANUAL-REPAIR] Request received - model={model}")
+
+    try:
+        result = await run_minimal_repair_workflow_manual(model)
+        logger.info(f"[MANUAL-REPAIR] Completed - success={result.success}")
+        return result
+
+    except Exception as e:
+        logger.error(f"[MANUAL-REPAIR] Failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Manual repair failed: {str(e)}")
+
 
 
 # ===== Chat Endpoints =====
@@ -182,48 +210,6 @@ async def chat(request: ChatRequest):
     except Exception as e:
         logger.error(f"Chat failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
-
-
-@app.post("/chat/compare")
-async def compare_chat(message: str):
-    """
-    Send the same message to both models and compare responses.
-
-    Args:
-        message: User message
-
-    Returns:
-        Comparison of both model responses
-    """
-    logger.info("Running chat comparison with both models")
-
-    try:
-        # Run both models in parallel
-        import asyncio
-        results = await asyncio.gather(
-            run_chat(message, "a"),
-            run_chat(message, "b")
-        )
-
-        response_a, latency_a = results[0]
-        response_b, latency_b = results[1]
-
-        return {
-            "model_a": {
-                "model": os.getenv("MODEL_A_NAME"),
-                "response": response_a,
-                "latency_seconds": latency_a
-            },
-            "model_b": {
-                "model": os.getenv("MODEL_B_NAME"),
-                "response": response_b,
-                "latency_seconds": latency_b
-            }
-        }
-
-    except Exception as e:
-        logger.error(f"Chat comparison failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Chat comparison failed: {str(e)}")
 
 
 # ===== Status and Metrics Endpoints =====
@@ -282,6 +268,41 @@ async def get_metrics_endpoint():
     }
 
 
+# ===== Debug Endpoints =====
+
+@app.post("/debug/test")
+async def debug_test(message: str = "Hello, can you respond?", model: Literal["a", "b"] = "a"):
+    """
+    Test minimal agent with NO TOOLS to diagnose PydanticAI hanging.
+
+    Args:
+        message: Test message
+        model: Which model to use ("a" or "b")
+
+    Returns:
+        Test result dictionary
+    """
+    logger.info(f"Debug test endpoint called - model={model}")
+    result = await run_debug_test(message, model)
+    return result
+
+
+@app.post("/debug/direct-llm")
+async def debug_direct_llm(model: Literal["a", "b"] = "a"):
+    """
+    Bypass PydanticAI and call Ollama directly to diagnose issues.
+
+    Args:
+        model: Which model to use ("a" or "b")
+
+    Returns:
+        Test result dictionary
+    """
+    logger.info(f"Direct LLM test endpoint called - model={model}")
+    result = await run_direct_llm_test(model)
+    return result
+
+
 # ===== Root Endpoint =====
 
 @app.get("/")
@@ -292,14 +313,12 @@ async def root():
         "version": "1.0.0",
         "description": "Autonomous AI agent for system monitoring and repair",
         "models": {
-            "a": os.getenv("MODEL_A_NAME", "llama3.2:1b"),
-            "b": os.getenv("MODEL_B_NAME", "qwen2.5:0.5b")
+            "a": os.getenv("MODEL_A_NAME", "mistral:7b-instruct"),
+            "b": os.getenv("MODEL_B_NAME", "ministral-3:8b-instruct-2512-q8_0")
         },
         "endpoints": {
             "repair": "POST /repair?model={a|b}",
-            "repair_compare": "POST /repair/compare",
             "chat": "POST /chat",
-            "chat_compare": "POST /chat/compare?message=...",
             "status": "GET /status",
             "metrics": "GET /metrics",
             "health": "GET /health"

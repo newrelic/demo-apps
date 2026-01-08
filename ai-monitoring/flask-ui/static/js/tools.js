@@ -1,71 +1,45 @@
-// Repair Mode Functionality
+// Tools Mode Functionality
 
-console.log('[Repair] Initializing repair mode');
+console.log('[Tools] Initializing tools mode');
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[Repair] DOM loaded, setting up repair mode controls');
+    console.log('[Tools] DOM loaded, setting up tools mode controls');
     const triggerBtn = document.getElementById('trigger-repair-btn');
     const modelSelect = document.getElementById('model-select');
     const progressDiv = document.getElementById('repair-progress');
     const resultsSection = document.getElementById('repair-results');
     const resultsContent = document.getElementById('results-content');
 
-    // Container status polling
-    function updateContainerStatus() {
-        console.log('[Repair] Updating container status');
-        api.get('/api/containers').then(data => {
-            if (data.error) {
-                document.getElementById('container-grid').innerHTML =
-                    `<div class="error">Error: ${data.error}</div>`;
-                return;
-            }
+    const streamSection = document.getElementById('execution-stream');
+    const streamContent = document.getElementById('stream-content');
 
-            try {
-                const containers = JSON.parse(data.result || '[]');
-                console.log(`[Repair] Found ${containers.length} containers`);
-                const grid = document.getElementById('container-grid');
-                grid.innerHTML = containers.map(c => {
-                    const statusIcon = c.status === 'running' ? '🟢' :
-                                       c.status === 'exited' || c.status === 'dead' ? '🔴' : '🟡';
-                    return `
-                        <div class="container-card">
-                            <div class="container-name">${c.name.replace('aim-', '')}</div>
-                            <div class="container-status">${statusIcon} ${c.status}</div>
-                            <div class="container-uptime">⏱️ ${c.uptime || 'unknown'}</div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (e) {
-                console.error('Failed to parse containers:', e);
-            }
-        });
-    }
-
-    // Start polling containers (every 15 seconds)
-    polling.start('containers', updateContainerStatus, 15000);
-    console.log('[Repair] Container status polling started (15s interval)');
-
-    // Refresh button
-    document.getElementById('refresh-status-btn').addEventListener('click', updateContainerStatus);
-
-    // Trigger repair
+    // Trigger tool execution
     triggerBtn.addEventListener('click', async () => {
         const model = modelSelect.value;
-        const endpoint = model === 'compare' ? '/repair/compare' : '/repair/trigger';
-        const params = model === 'compare' ? {} : { model };
+        const endpoint = '/tools/trigger';
+        const params = { model };
 
-        console.log('[Repair] Triggering repair workflow:', { model, endpoint });
+        console.log('[Tools] Triggering tool execution workflow:', { model, endpoint });
 
-        // Show progress
+        // Show progress and stream
         triggerBtn.disabled = true;
         progressDiv.style.display = 'block';
         resultsSection.style.display = 'none';
+        streamSection.style.display = 'block';
+        streamContent.innerHTML = '';
+
+        // Add initial log
+        addStreamLog('🚀 Starting tool execution workflow...', 'info');
+        addStreamLog(`📋 Model selected: ${model === 'a' ? 'Model A (mistral:7b-instruct)' : 'Model B (ministral-3:8b)'}`, 'info');
 
         const startTime = performance.now();
         try {
             const result = await api.post(endpoint, params);
             const duration = performance.now() - startTime;
-            console.log(`[Repair] Repair workflow completed in ${(duration / 1000).toFixed(2)}s`);
+            console.log(`[Tools] Tool execution workflow completed in ${(duration / 1000).toFixed(2)}s`);
+
+            // Simulate progressive display of tool calls
+            await displayProgressiveLogs(result);
 
             // Hide progress
             progressDiv.style.display = 'none';
@@ -73,12 +47,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Display results
             resultsSection.style.display = 'block';
-            resultsContent.innerHTML = renderRepairResults(result, model === 'compare');
+            resultsContent.innerHTML = renderToolResults(result);
+
+            // Final log entry
+            if (result.success) {
+                addStreamLog(`✅ Workflow completed successfully in ${(duration / 1000).toFixed(2)}s`, 'success');
+            } else {
+                addStreamLog('❌ Workflow completed with errors', 'error');
+            }
 
         } catch (error) {
-            console.error('[Repair] Repair workflow failed:', error);
+            console.error('[Tools] Tool execution workflow failed:', error);
             progressDiv.style.display = 'none';
             triggerBtn.disabled = false;
+
+            addStreamLog(`❌ Error: ${error.message || 'Unknown error occurred'}`, 'error');
 
             // Display error in results section instead of alert
             resultsSection.style.display = 'block';
@@ -86,118 +69,104 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Store raw logs for filtering
-    let rawLogs = '';
+    function addStreamLog(message, type = 'info') {
+        const logEntry = document.createElement('div');
+        logEntry.className = `stream-log stream-log-${type}`;
 
-    // Filter logs based on checkbox
-    function filterLogs(logs) {
-        const filterHealthChecks = document.getElementById('filter-health-checks').checked;
+        const timestamp = new Date().toLocaleTimeString();
+        logEntry.innerHTML = `
+            <span class="stream-timestamp">[${timestamp}]</span>
+            <span class="stream-message">${escapeHtml(message)}</span>
+        `;
 
-        if (!filterHealthChecks) {
-            return logs;
-        }
-
-        // Filter out health check and monitoring/polling related log lines
-        const lines = logs.split('\n');
-        const filtered = lines.filter(line => {
-            const lowerLine = line.toLowerCase();
-
-            // Filter patterns for health checks
-            if (lowerLine.includes('get /health') ||
-                lowerLine.includes('get /api/health') ||
-                lowerLine.includes('head /health') ||
-                lowerLine.includes('"get /health http') ||
-                lowerLine.includes('health check') ||
-                (lowerLine.includes('/health') && lowerLine.includes('200'))) {
-                return false;
-            }
-
-            // Filter patterns for metrics/stats polling
-            if (lowerLine.includes('get /metrics') ||
-                lowerLine.includes('"get /metrics http') ||
-                lowerLine.includes('get /stats/requests') ||
-                lowerLine.includes('/tools/locust_get_stats') ||
-                lowerLine.includes('retrieved load test results')) {
-                return false;
-            }
-
-            // Filter patterns for Ollama model polling
-            if (lowerLine.includes('[gin]') && lowerLine.includes('get') && lowerLine.includes('/api/tags')) {
-                return false;
-            }
-
-            // Filter httpx requests to locust stats
-            if (lowerLine.includes('httpx') && lowerLine.includes('http request: get') &&
-                lowerLine.includes('locust') && lowerLine.includes('/stats')) {
-                return false;
-            }
-
-            return true;
-        });
-
-        return filtered.join('\n');
+        streamContent.appendChild(logEntry);
+        streamContent.scrollTop = streamContent.scrollHeight;
     }
 
-    // Update logs display with current filter
-    function updateLogsDisplay() {
-        const logsDisplay = document.getElementById('logs-display');
-        if (rawLogs) {
-            const filtered = filterLogs(rawLogs);
-            logsDisplay.textContent = filtered || 'No logs available (all filtered out)';
+    async function displayProgressiveLogs(result) {
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-            // Show count of filtered lines
-            const totalLines = rawLogs.split('\n').filter(l => l.trim()).length;
-            const filteredLines = filtered.split('\n').filter(l => l.trim()).length;
-            const hiddenCount = totalLines - filteredLines;
+        // Display model info
+        if (result.model_used) {
+            addStreamLog(`🤖 Using model: ${result.model_used}`, 'info');
+            await delay(300);
+        }
 
-            if (hiddenCount > 0 && document.getElementById('filter-health-checks').checked) {
-                logsDisplay.textContent = `[Filtered out ${hiddenCount} monitoring/polling log line(s)]\n\n` + filtered;
+        // Display AI reasoning/analysis
+        if (result.ai_reasoning) {
+            await delay(400);
+            addStreamLog('🧠 AI Analysis:', 'info');
+            await delay(200);
+
+            // Split reasoning into sentences for better display
+            const sentences = result.ai_reasoning.split(/[.!?]+/).filter(s => s.trim());
+            for (const sentence of sentences.slice(0, 3)) { // Show first 3 sentences
+                if (sentence.trim()) {
+                    addStreamLog(`   ${sentence.trim()}.`, 'action');
+                    await delay(300);
+                }
+            }
+
+            await delay(400);
+            addStreamLog('📋 Beginning tool execution based on analysis...', 'info');
+            await delay(300);
+        }
+
+        // Display tool calls progressively
+        if (result.tool_calls && result.tool_calls.length > 0) {
+            addStreamLog(`🔧 Executing ${result.tool_calls.length} tool call(s)...`, 'info');
+            await delay(400);
+
+            for (const toolCall of result.tool_calls) {
+                const args = Object.keys(toolCall.arguments).length > 0
+                    ? `(${Object.entries(toolCall.arguments).map(([k, v]) => `${k}=${v}`).join(', ')})`
+                    : '()';
+
+                addStreamLog(`🔨 Calling ${toolCall.tool_name}${args}`, 'tool');
+                await delay(400);
+
+                if (toolCall.success) {
+                    const resultPreview = toolCall.result ?
+                        (toolCall.result.length > 100 ? toolCall.result.substring(0, 100) + '...' : toolCall.result) :
+                        'Success';
+                    addStreamLog(`  ✓ ${toolCall.tool_name} completed: ${resultPreview}`, 'success');
+                } else {
+                    const errorMsg = toolCall.error || 'Unknown error';
+                    addStreamLog(`  ✗ ${toolCall.tool_name} failed: ${errorMsg}`, 'error');
+                }
+                await delay(300);
             }
         }
+
+        // Display actions taken
+        if (result.actions_taken && result.actions_taken.length > 0) {
+            await delay(400);
+            addStreamLog('📝 Actions taken:', 'info');
+            await delay(200);
+            for (const action of result.actions_taken) {
+                addStreamLog(`  • ${action}`, 'action');
+                await delay(250);
+            }
+        }
+
+        // Display final status
+        if (result.final_status) {
+            await delay(400);
+            addStreamLog(`📊 Status: ${result.final_status}`, result.success ? 'success' : 'warning');
+        }
+
+        await delay(300);
     }
 
-    // Fetch logs
-    document.getElementById('fetch-logs-btn').addEventListener('click', async () => {
-        const container = document.getElementById('container-select').value;
-        const lines = document.getElementById('log-lines').value;
-
-        console.log('[Repair] Fetching logs:', { container, lines });
-
-        try {
-            const data = await api.get(`/api/logs/${container}?lines=${lines}`);
-            rawLogs = data.result || 'No logs available';
-
-            const logsDisplay = document.getElementById('logs-display');
-            logsDisplay.style.display = 'block';
-            updateLogsDisplay();
-
-            const totalLines = rawLogs.split('\n').filter(l => l.trim()).length;
-            console.log(`[Repair] Fetched ${totalLines} lines of logs`);
-        } catch (error) {
-            console.error('[Repair] Failed to fetch logs:', error);
-            alert(`Error fetching logs: ${error.message}`);
-        }
-    });
-
-    // Toggle filter
-    document.getElementById('filter-health-checks').addEventListener('change', () => {
-        console.log('[Repair] Monitoring/polling logs filter toggled');
-        updateLogsDisplay();
-    });
-
-    console.log('[Repair] Event listeners configured');
+    console.log('[Tools] Event listeners configured');
 });
 
-function renderRepairResults(result, isComparison) {
+function renderToolResults(result) {
     if (result.error) {
         return renderErrorMessage(result.error);
     }
 
-    if (isComparison) {
-        return renderComparisonResults(result);
-    } else {
-        return renderSingleRepairResults(result);
-    }
+    return renderSingleToolResults(result);
 }
 
 function renderErrorMessage(errorMsg) {
@@ -223,7 +192,7 @@ function renderErrorMessage(errorMsg) {
         title = "AI Model Can't Follow Instructions";
         explanation = "The Ollama model tried to help, but kept returning conversational text instead of the structured data format it needs to return. " +
                      "This is like asking someone to fill out a form, but they just write you a letter instead. " +
-                     "Small language models (like llama3.2:1b and qwen2.5:0.5b) often struggle with structured output.";
+                     "Even larger models (like mistral:7b-instruct and ministral-3:8b-instruct-2512-q8_0) can occasionally struggle with structured output.";
         suggestions = [
             "Try running the repair again - sometimes it works on the second try",
             "Try using Model B instead (it's smaller but sometimes better at following format rules)",
@@ -286,7 +255,7 @@ function renderErrorMessage(errorMsg) {
     }
 
     return `
-        <div class="repair-result error">
+        <div class="tool-result error">
             <h3>❌ ${title}</h3>
             <div class="error-explanation">
                 <h4>What Happened:</h4>
@@ -308,7 +277,7 @@ function renderErrorMessage(errorMsg) {
     `;
 }
 
-function renderSingleRepairResults(result) {
+function renderSingleToolResults(result) {
     // Check if this is a validation error (model returning wrong format)
     if (!result.success && result.final_status &&
         (result.final_status.includes('output validation') ||
@@ -347,16 +316,27 @@ function renderSingleRepairResults(result) {
         </div>
     ` : '';
 
+    // Render AI reasoning if available
+    const aiReasoningHtml = result.ai_reasoning ? `
+        <div class="tool-calls">
+            <h4>🧠 AI Analysis:</h4>
+            <div class="tool-call-result" style="margin-top: 10px;">
+                ${escapeHtml(result.ai_reasoning)}
+            </div>
+        </div>
+    ` : '';
+
     return `
-        <div class="repair-result ${statusClass}">
+        <div class="tool-result ${statusClass}">
             <h3>${statusIcon} ${result.success ? 'Success' : 'Failed'}</h3>
             <div class="metrics">
                 <div class="metric"><strong>Model:</strong> ${result.model_used}</div>
                 <div class="metric"><strong>Latency:</strong> ${result.latency_seconds.toFixed(2)}s</div>
-                <div class="metric"><strong>Containers Restarted:</strong> ${(result.containers_restarted || []).length}</div>
+                <div class="metric"><strong>Services Affected:</strong> ${(result.containers_restarted || []).length}</div>
                 <div class="metric"><strong>Tool Calls:</strong> ${(result.tool_calls || []).length}</div>
             </div>
             <p><strong>Final Status:</strong> ${result.final_status}</p>
+            ${aiReasoningHtml}
             ${toolCallsHtml}
             <div class="actions">
                 <h4>Actions Taken:</h4>
@@ -372,27 +352,4 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-}
-
-function renderComparisonResults(result) {
-    const modelA = result.model_a_result || {};
-    const modelB = result.model_b_result || {};
-
-    return `
-        <div class="comparison-grid">
-            <div class="comparison-column">
-                <h3>Model A Results</h3>
-                ${renderSingleRepairResults(modelA)}
-            </div>
-            <div class="comparison-column">
-                <h3>Model B Results</h3>
-                ${renderSingleRepairResults(modelB)}
-            </div>
-        </div>
-        <div class="repair-result">
-            <h3>🏆 Comparison Summary</h3>
-            <p><strong>Winner:</strong> ${result.winner === 'a' ? 'Model A' : result.winner === 'b' ? 'Model B' : 'Tie'}</p>
-            <p><strong>Reason:</strong> ${result.reason || 'N/A'}</p>
-        </div>
-    `;
 }

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Relic AIM Demo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+</head>
+<body>
+    <div class="home-container">
+        <header class="home-header">
+            <div class="logo">
+                <h1>🤖 New Relic AIM Demo</h1>
+                <p class="subtitle">AI Monitoring & Distributed Tracing Showcase</p>
+            </div>
+        </header>
+
+        <main class="home-content">
+            <section class="intro-section">
+                <h2>About This Demo</h2>
+                <p>
+                    This application demonstrates <strong>New Relic's AI Monitoring (AIM)</strong> and
+                    <strong>distributed tracing</strong> capabilities in an agentic AI architecture.
+                </p>
+                <p>
+                    The demo showcases how New Relic captures telemetry across AI agent workflows,
+                    tool invocations, and multi-service interactions - providing complete visibility
+                    into your AI application's performance and behavior.
+                </p>
+            </section>
+
+            <section class="architecture-section">
+                <h2>Architecture Overview</h2>
+                <div class="architecture-grid">
+                    <div class="arch-card">
+                        <div class="arch-icon">🧠</div>
+                        <h3>AI Agent</h3>
+                        <p>Autonomous reasoning engine powered by LLMs (Mistral & Ministral) that makes decisions and invokes tools</p>
+                    </div>
+                    <div class="arch-card">
+                        <div class="arch-icon">🔧</div>
+                        <h3>MCP Server</h3>
+                        <p>Model Context Protocol server exposing generic system operation tools (health checks, logs, diagnostics)</p>
+                    </div>
+                    <div class="arch-card">
+                        <div class="arch-icon">📊</div>
+                        <h3>New Relic AIM</h3>
+                        <p>Captures distributed traces, AI inference metrics, tool invocations, and custom events across all services</p>
+                    </div>
+                    <div class="arch-card">
+                        <div class="arch-icon">⚡</div>
+                        <h3>Load Generator</h3>
+                        <p>Locust-based traffic generation simulating user interactions for realistic telemetry data</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="features-section">
+                <h2>What You Can Demonstrate</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <h4>🔍 Distributed Tracing</h4>
+                        <ul>
+                            <li>Full transaction timeline across AI agent → MCP server → tools</li>
+                            <li>Service dependency visualization</li>
+                            <li>Performance bottleneck identification</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🤖 AI Monitoring</h4>
+                        <ul>
+                            <li>Model performance metrics (latency, token usage)</li>
+                            <li>Tool invocation patterns and success rates</li>
+                            <li>Prompt/response correlation</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🎯 Custom Attributes</h4>
+                        <ul>
+                            <li>Model names and versions on every transaction</li>
+                            <li>Tool names, parameters, and execution results</li>
+                            <li>Custom business logic tracking</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🚨 Error Tracking</h4>
+                        <ul>
+                            <li>Tool failures captured with full context</li>
+                            <li>Model errors and timeouts logged</li>
+                            <li>Complete debugging information</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section class="navigation-section">
+                <h2>Get Started</h2>
+                <div class="nav-cards">
+                    <a href="{{ url_for('tools.tools_mode') }}" class="nav-card">
+                        <div class="nav-icon">🔧</div>
+                        <h3>Tool Execution</h3>
+                        <p>Trigger autonomous workflows with multi-step tool invocations. Watch the AI agent reason, plan, and execute system operations.</p>
+                        <div class="nav-arrow">→</div>
+                    </a>
+                    <a href="{{ url_for('chat.chat_mode') }}" class="nav-card">
+                        <div class="nav-icon">💬</div>
+                        <h3>Chat Assistant</h3>
+                        <p>Free-form conversation with the AI agent. Test boundary conditions, hallucination detection, and prompt injection scenarios.</p>
+                        <div class="nav-arrow">→</div>
+                    </a>
+                </div>
+            </section>
+
+            <section class="technical-details">
+                <details>
+                    <summary>📋 Technical Details</summary>
+                    <div class="details-content">
+                        <h4>Services Architecture</h4>
+                        <ul>
+                            <li><strong>ollama-model-a:</strong> Mistral 7B Instruct (reliable & accurate)</li>
+                            <li><strong>ollama-model-b:</strong> Ministral 3B 8-bit quantized (efficient & fast)</li>
+                            <li><strong>ai-agent:</strong> PydanticAI-based reasoning engine with tool calling</li>
+                            <li><strong>mcp-server:</strong> FastAPI server exposing 6 generic system operation tools</li>
+                            <li><strong>flask-ui:</strong> Web interface for manual interaction and demonstration</li>
+                            <li><strong>locust:</strong> Load generation for background telemetry</li>
+                        </ul>
+                        <h4>System Operations (Mock Tools)</h4>
+                        <ul>
+                            <li>check_system_health() - Overall system status</li>
+                            <li>get_service_logs() - Recent log retrieval</li>
+                            <li>restart_service() - Service restart simulation</li>
+                            <li>check_database_status() - Database health check</li>
+                            <li>update_configuration() - Config updates</li>
+                            <li>run_diagnostics() - Comprehensive health checks</li>
+                        </ul>
+                        <p class="note">
+                            <strong>Note:</strong> All tools return realistic mock data with simulated latency (0.2-3s).
+                            This creates authentic distributed traces without requiring real infrastructure operations.
+                        </p>
+                        <p class="debug-note">
+                            <strong>Debug Mode:</strong> For testing and diagnostics, you can manually navigate to
+                            <code>/debug</code> to access raw tool testing capabilities.
+                        </p>
+                    </div>
+                </details>
+            </section>
+        </main>
+
+        <footer class="home-footer">
+            <p>🔬 Built for New Relic AI Monitoring Demonstrations</p>
+            <p class="footer-links">
+                <a href="{{ config.AGENT_URL }}/docs" target="_blank">Agent API</a> •
+                <a href="{{ config.MCP_URL }}/docs" target="_blank">MCP Server</a> •
+                <a href="http://localhost:8089" target="_blank">Locust UI</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

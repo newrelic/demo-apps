@@ -1,14 +1,14 @@
-# Locust Tests - Load Testing with A/B Model Comparison
+# Locust Tests - Load Generation for New Relic Telemetry
 
-Load testing suite using Locust that simulates realistic traffic to the target-app and AI agent, with built-in A/B testing for comparing Model A and Model B performance.
+Load generation suite using Locust that creates background telemetry by simulating user interactions with the Flask UI and AI agent. Provides realistic traffic for New Relic distributed tracing and AI monitoring demonstrations.
 
 ## Features
 
-- **Target App Traffic Simulation**: Realistic business traffic (health checks, orders, products)
+- **Flask UI Traffic Generation**: Simulates users accessing chat and repair pages
 - **A/B Model Comparison**: 50/50 split traffic between Model A and Model B
 - **Repair Workflow Testing**: Automated repair triggers with performance tracking
 - **Chat Interface Load**: Simulates user chat interactions with both models
-- **Passive Load Generation**: Demo data generation with weighted prompt distribution
+- **Passive Load Generation**: Background telemetry generation with weighted prompt distribution
 - **Web UI**: Real-time metrics dashboard on port 8089
 - **HTTP API**: Programmatic control for automated testing
 
@@ -111,7 +111,7 @@ locust-tests/
 
 ### 2. ModelAUser - AI Agent Repair (Model A)
 
-**Purpose**: Test AI agent repair workflows using Model A (llama3.2:1b)
+**Purpose**: Test AI agent repair workflows using Model A (mistral:7b-instruct)
 
 **Configuration**:
 - **Host**: `http://ai-agent:8001`
@@ -128,7 +128,7 @@ locust-tests/
 
 ### 3. ModelBUser - AI Agent Repair (Model B)
 
-**Purpose**: Test AI agent repair workflows using Model B (qwen2.5:0.5b)
+**Purpose**: Test AI agent repair workflows using Model B (ministral-3:8b-instruct-2512-q8_0)
 
 **Configuration**:
 - **Host**: `http://ai-agent:8001`

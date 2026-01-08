@@ -1,0 +1,149 @@
+/* Debug Page Styles */
+
+.debug-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.debug-container h1 {
+    font-size: 2rem;
+    margin-bottom: 15px;
+    color: var(--text-primary);
+}
+
+.debug-container > p {
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    margin-bottom: 20px;
+}
+
+/* Test Sections */
+.test-section {
+    margin-bottom: 30px;
+    padding: 25px;
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.test-section h2 {
+    font-size: 1.5rem;
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--secondary-color);
+    padding-bottom: 10px;
+}
+
+.test-section p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.test-section label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.test-section select,
+.test-section input[type="text"] {
+    padding: 10px;
+    background-color: var(--darker-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.test-section select:hover,
+.test-section input[type="text"]:hover {
+    border-color: var(--secondary-color);
+}
+
+.test-section select:focus,
+.test-section input[type="text"]:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 2px rgba(0, 201, 167, 0.2);
+}
+
+.test-section select {
+    width: 200px;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.test-section input[type="text"] {
+    width: 100%;
+    max-width: 500px;
+    margin-bottom: 10px;
+}
+
+/* Result Display */
+.test-result {
+    margin-top: 15px;
+}
+
+.test-result h3 {
+    color: var(--text-primary);
+}
+
+.test-result pre {
+    background: var(--darker-bg) !important;
+    color: var(--text-primary) !important;
+    padding: 15px;
+    border-radius: 5px;
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+}
+
+/* Interpretation Guide */
+.interpretation-guide {
+    background-color: var(--card-bg);
+    padding: 25px;
+    border-radius: 10px;
+    margin-top: 30px;
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--accent-blue);
+}
+
+.interpretation-guide h3 {
+    font-size: 1.5rem;
+    margin: 0 0 20px 0;
+    color: var(--accent-blue);
+    border-bottom: 2px solid var(--accent-blue);
+    padding-bottom: 10px;
+}
+
+.interpretation-guide ul {
+    line-height: 1.8;
+    color: var(--text-secondary);
+}
+
+.interpretation-guide li {
+    margin: 8px 0;
+}
+
+.interpretation-guide strong {
+    color: var(--text-primary);
+}
+
+/* Horizontal Rules */
+hr {
+    border: none;
+    border-top: 2px solid var(--border-color);
+    margin: 40px 0;
+    opacity: 0.5;
+}
+
+/* Spinner */
+.spinner-text {
+    display: none;
+    margin-left: 10px;
+    color: var(--text-secondary);
+}

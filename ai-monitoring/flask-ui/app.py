@@ -1,12 +1,14 @@
 """
-AI Monitoring Demo - Flask UI
+New Relic AIM Demo - Flask UI
 
-Main Flask application factory that provides navigation between different modes:
-- Repair Mode: Autonomous system repair
-- Chat Mode: Free-form conversation for hallucination detection
-- Model Comparison: Performance metrics and A/B testing
+Main Flask application factory that provides:
+- Tool Execution: Autonomous workflows with multi-step tool invocations
+- Chat Assistant: Free-form conversation with AI agents
+- Debug Mode: Raw tool testing capabilities (accessible at /debug)
 """
 
+import logging
+import sys
 from flask import Flask, session
 from flask_session import Session
 from config import Config
@@ -17,20 +19,33 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # Configure logging to stdout (for Docker logs)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)]
+    )
+
+    # Set Flask app logger to INFO
+    app.logger.setLevel(logging.INFO)
+
+    # Suppress werkzeug access logs (noisy from polling)
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
+
     # Initialize Flask-Session
     Session(app)
 
     # Register blueprints
     from routes.main import bp as main_bp
-    from routes.repair import bp as repair_bp
+    from routes.tools import bp as tools_bp
     from routes.chat import bp as chat_bp
-    from routes.comparison import bp as comparison_bp
+    from routes.debug import bp as debug_bp
     from routes.api import bp as api_bp
 
     app.register_blueprint(main_bp)
-    app.register_blueprint(repair_bp, url_prefix='/repair')
+    app.register_blueprint(tools_bp, url_prefix='/tools')
     app.register_blueprint(chat_bp, url_prefix='/chat')
-    app.register_blueprint(comparison_bp, url_prefix='/comparison')
+    app.register_blueprint(debug_bp, url_prefix='/debug')
     app.register_blueprint(api_bp, url_prefix='/api')
 
     # Context processor for global template variables

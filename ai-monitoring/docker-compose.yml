@@ -1,7 +1,7 @@
 name: aim
 
 services:
-  # Model A - Fast baseline (Llama 3.2 3B)
+  # Model A - Reliable JSON formatting (Mistral 7B Instruct v0.3)
   ollama-model-a:
     build:
       context: .
@@ -13,6 +13,10 @@ services:
       - ollama-data-a:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=1          # Only process 1 request at a time
+      - OLLAMA_MAX_LOADED_MODELS=1     # Only keep 1 model in memory
+      - OLLAMA_NUM_THREAD=12           # Use all 12 CPU threads (test one model at a time)
+      - OLLAMA_CONTEXT_LENGTH=8192     # Context window size (default 4096 was too small)
       #- NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
@@ -25,11 +29,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 6G
+          cpus: '12.0'
+          memory: 12G
         reservations:
-          memory: 4G
+          cpus: '8.0'
+          memory: 8G
 
-  # Model B - Ultra lightweight (Qwen 2.5 0.5B)
+  # Model B - Ministral 3:8b with 8-bit quantization (q8_0)
   ollama-model-b:
     build:
       context: .
@@ -41,6 +47,10 @@ services:
       - ollama-data-b:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=1          # Only process 1 request at a time
+      - OLLAMA_MAX_LOADED_MODELS=1     # Only keep 1 model in memory
+      - OLLAMA_NUM_THREAD=12           # Use all 12 CPU threads (test one model at a time)
+      - OLLAMA_CONTEXT_LENGTH=8192     # Context window size (default 4096 was too small)
       #- NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
@@ -53,36 +63,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          cpus: '12.0'
+          memory: 12G
         reservations:
-          memory: 1G
+          cpus: '8.0'
+          memory: 8G
 
-  # Target App - Fragile FastAPI service
-  target-app:
-    build:
-      context: ./target-app
-      dockerfile: Dockerfile
-    container_name: aim-target-app
-    ports:
-      - "8000:8000"
-    volumes:
-      - failure-state:/tmp
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - FAILURE_STATE_FILE=${FAILURE_STATE_FILE}
-      #- NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    networks:
-      - aim-network
-    restart: unless-stopped
-
-  # MCP Server - Tool interface for Docker and Locust control
+  # MCP Server - Tool interface for generic system operations
   mcp-server:
     build:
       context: ./mcp-server
@@ -90,17 +77,11 @@ services:
     container_name: aim-mcp-server
     ports:
       - "8002:8002"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - failure-state:/tmp
     environment:
-      - DOCKER_HOST=${DOCKER_HOST}
-      - LOCUST_URL=${LOCUST_URL}
       - MCP_PORT=${MCP_PORT}
+      - LOG_LEVEL=${LOG_LEVEL}
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME_MCP_SERVER}
-    depends_on:
-      - locust
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
       interval: 60s
@@ -156,7 +137,7 @@ services:
     environment:
       - AGENT_URL=${AGENT_URL}
       - MCP_URL=${MCP_URL}
-      - SECRET_KEY=${FLASK_SECRET_KEY}
+      - SECRET_KEY=${FLASK_SECRET_KEY:-demo-secret-key-change-in-production}
       # New Relic
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME_FLASK_UI}
@@ -168,28 +149,7 @@ services:
       - aim-network
     restart: unless-stopped
 
-  # Chaos Engine - Failure injection service
-  chaos-engine:
-    build:
-      context: ./chaos-engine
-      dockerfile: Dockerfile
-    container_name: aim-chaos-engine
-    volumes:
-      - failure-state:/tmp
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - CHAOS_INTERVAL=${CHAOS_INTERVAL}
-      - TARGET_CONTAINER=${TARGET_CONTAINER}
-      - FAILURE_STATE_FILE=${FAILURE_STATE_FILE}
-      - CHAOS_ENABLED=${CHAOS_ENABLED}
-    depends_on:
-      target-app:
-        condition: service_healthy
-    networks:
-      - aim-network
-    restart: unless-stopped
-
-  # Locust - Load testing with A/B traffic split
+  # Locust - Load generation for New Relic telemetry
   locust:
     build:
       context: ./locust-tests
@@ -198,16 +158,16 @@ services:
     ports:
       - "8089:8089"
     environment:
-      - TARGET_APP_URL=${TARGET_APP_URL}
+      - FLASK_UI_URL=${FLASK_UI_URL}
       - AI_AGENT_URL=${AI_AGENT_URL}
       - LOCUST_WEB_PORT=${LOCUST_WEB_PORT}
     command: >
       --web-host 0.0.0.0
       --web-port 8089
-      --host http://target-app:8000
+      --host http://flask-ui:8501
     depends_on:
-      target-app:
-        condition: service_healthy
+      flask-ui:
+        condition: service_started
     networks:
       - aim-network
     restart: unless-stopped
@@ -222,5 +182,3 @@ volumes:
     name: aim-ollama-data-a
   ollama-data-b:
     name: aim-ollama-data-b
-  failure-state:
-    name: aim-failure-state

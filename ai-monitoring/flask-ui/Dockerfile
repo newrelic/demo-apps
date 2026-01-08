@@ -20,6 +20,7 @@ CMD ["newrelic-admin", "run-program", "gunicorn", \
      "--bind", "0.0.0.0:8501", \
      "--workers", "4", \
      "--timeout", "120", \
-     "--access-logfile", "-", \
+     "--log-level", "info", \
      "--error-logfile", "-", \
+     "--capture-output", \
      "wsgi:app"]

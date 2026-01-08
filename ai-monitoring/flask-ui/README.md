@@ -1,32 +1,38 @@
-# AI Monitoring Demo - Flask UI
+# New Relic AIM Demo - Flask UI
 
-Flask-based web application for demonstrating New Relic AI monitoring capabilities with autonomous system repair, model comparison, and hallucination detection.
+Flask-based web application for demonstrating New Relic AI Monitoring (AIM) capabilities with autonomous tool execution workflows and hallucination detection.
 
 ## Features
 
-### 🔧 Repair System
-- Autonomous system repair with Docker container monitoring
-- Side-by-side model comparison (llama3.2:1b vs qwen2.5:0.5b)
-- Real-time container status updates via polling
-- Container logs viewer
+### 🏠 Home Page
+- Landing page with demo overview and navigation
+- Architecture diagram and technical details
+- Navigation cards to Tool Execution and Chat pages
+- Documentation of available system operation tools
 
-### 💬 Chat Assistant
+### 🔧 Tool Execution (/tools)
+- Autonomous AI workflows with multi-step tool invocations
+- Real-time system status updates via polling
+- Service logs viewer with filtering
+- Model selection (Model A or Model B)
+- All tools return realistic mock data (no real operations)
+
+### 💬 Chat Assistant (/chat)
 - Interactive chat interface with persistent session history
-- Model comparison mode
+- Model selection (Model A or Model B)
 - Example prompts for boundary testing
 - Hallucination detection demonstration
 
-### 📊 Model Comparison Dashboard
-- Performance metrics and analytics
-- Interactive Plotly.js charts (latency, success rate)
-- Automated insights generation
-- Metrics export (JSON)
+### 🔬 Debug Mode (/debug)
+- Raw tool testing and diagnostics
+- Not linked in UI - accessible by manual navigation
+- Direct MCP tool invocation testing
 
 ## Architecture
 
 - **Frontend:** Flask + Jinja2 templates with vanilla JavaScript
-- **Real-time Updates:** AJAX polling (15s for containers, 30s for health, 10s for metrics)
-- **Charts:** Plotly.js for interactive visualizations
+- **Styling:** Dark theme site-wide for professional demo aesthetic
+- **Real-time Updates:** AJAX polling (15s for services, 30s for health)
 - **State Management:** Flask sessions (filesystem storage, upgradable to Redis)
 - **Monitoring:** New Relic browser + backend monitoring (automatic via APM agent)
 - **Deployment:** Docker + gunicorn (4 workers)
@@ -43,10 +49,10 @@ flask-ui/
 ├── newrelic.ini               # New Relic configuration
 │
 ├── routes/                     # Flask blueprints
-│   ├── main.py                # Home page
-│   ├── repair.py              # Repair mode
-│   ├── chat.py                # Chat mode
-│   ├── comparison.py          # Comparison dashboard
+│   ├── main.py                # Home page (landing)
+│   ├── tools.py               # Tool execution mode
+│   ├── chat.py                # Chat assistant mode
+│   ├── debug.py               # Debug mode (not linked in UI)
 │   └── api.py                 # AJAX API endpoints
 │
 ├── services/                   # Business logic
@@ -54,14 +60,25 @@ flask-ui/
 │   └── mcp_client.py          # MCP Server API client
 │
 ├── templates/                  # Jinja2 templates
-│   ├── base.html              # Base layout
+│   ├── base.html              # Base layout (dark theme)
 │   ├── components/            # Reusable components
 │   └── pages/                 # Page templates
+│       ├── home.html          # Landing page
+│       ├── tools.html         # Tool execution page
+│       ├── chat.html          # Chat page
+│       └── debug.html         # Debug page
 │
 ├── static/                     # Static assets
-│   ├── css/                   # Stylesheets
+│   ├── css/                   # Stylesheets (dark theme)
+│   │   ├── main.css           # Global styles
+│   │   ├── home.css           # Landing page
+│   │   ├── tools.css          # Tool execution
+│   │   └── chat.css           # Chat interface
 │   ├── js/                    # JavaScript
-│   └── vendor/                # Third-party libraries (Plotly.js)
+│   │   ├── main.js            # Global utilities
+│   │   ├── tools.js           # Tool execution
+│   │   └── chat.js            # Chat interface
+│   └── vendor/                # Third-party libraries
 │
 └── utils/                      # Utilities
     └── session_helpers.py     # Flask session management
@@ -70,27 +87,23 @@ flask-ui/
 ## Routes
 
 ### Page Routes
-- `GET /` - Home page (redirects to repair mode)
-- `GET /repair` - Repair system page
-- `GET /chat` - Chat interface page
-- `GET /comparison` - Model comparison dashboard
+- `GET /` - Home page (landing with navigation)
+- `GET /tools` - Tool execution page (autonomous workflows)
+- `GET /chat` - Chat assistant page (hallucination testing)
+- `GET /debug` - Debug mode page (not linked, manual navigation only)
 
 ### API Endpoints (Polled by JavaScript)
 - `GET /api/health` - Agent health status (30s poll)
-- `GET /api/metrics` - Model metrics (10s poll)
-- `GET /api/containers` - Docker container status (15s poll)
-- `GET /api/logs/<container>` - Container logs
+- `GET /api/containers` - Service status (15s poll)
+- `GET /api/logs/<container>` - Service logs
 - `GET /api/load-test/status` - Load test statistics (5s poll)
 - `POST /api/load-test/start` - Start load test
 - `POST /api/load-test/stop` - Stop load test
 
 ### Action Routes
-- `POST /repair/trigger` - Trigger repair workflow
-- `POST /repair/compare` - Compare both models
+- `POST /tools/trigger` - Trigger tool execution workflow
 - `POST /chat/send` - Send chat message
-- `POST /chat/compare` - Compare chat responses
 - `POST /chat/clear` - Clear chat history
-- `GET /comparison/export` - Export metrics JSON
 
 ## Environment Variables
 
@@ -192,7 +205,7 @@ docker-compose up -d flask-ui
 # Check Flask UI logs
 docker-compose logs -f flask-ui
 
-# Check all running services (should show 8)
+# Check all running services (should show 6)
 docker-compose ps
 
 # Access the application
@@ -215,7 +228,7 @@ open http://localhost:8501
 #### Service Health Check
 
 ```bash
-# All 8 services should be running
+# All 6 services should be running
 docker-compose ps
 
 # Expected output:
@@ -224,8 +237,6 @@ docker-compose ps
 # aim-ai-agent          running (healthy)
 # aim-mcp-server        running (healthy)
 # aim-flask-ui          running
-# aim-target-app        running (healthy)
-# aim-chaos-engine      running
 # aim-locust            running
 ```
 
@@ -233,7 +244,6 @@ docker-compose ps
 
 - **Flask UI**: http://localhost:8501
 - **Locust UI**: http://localhost:8089
-- **Target App**: http://localhost:8000/health
 - **AI Agent**: http://localhost:8001/health
 - **MCP Server**: http://localhost:8002/health
 
@@ -280,34 +290,34 @@ This confirms automatic WSGI instrumentation is working.
 
 ### Testing Checklist
 
-#### Repair Mode
-- [ ] Container status grid displays 8 containers
-- [ ] Container status updates automatically every 15s
-- [ ] Model selection works (Model A, Model B, Compare Both)
-- [ ] Repair trigger button shows progress spinner
-- [ ] Results display with success/failure status
-- [ ] Metrics show latency, containers restarted, final status
-- [ ] Container logs viewer works for each container
-- [ ] Console shows `[Repair]` logs with timing
+#### Home Page
+- [ ] Landing page displays with architecture diagram
+- [ ] Navigation cards link to /tools and /chat
+- [ ] Technical details section expands correctly
+- [ ] Dark theme applied consistently
 
-#### Chat Mode
+#### Tool Execution Mode (/tools)
+- [ ] Service status grid displays all services
+- [ ] Service status updates automatically every 15s
+- [ ] Model selection works (Model A, Model B)
+- [ ] Workflow trigger button shows progress spinner
+- [ ] Results display with success/failure status
+- [ ] Metrics show latency, services affected, tool calls, final status
+- [ ] Service logs viewer works for each service
+- [ ] Console shows `[Tools]` logs with timing
+
+#### Chat Mode (/chat)
 - [ ] Chat history persists on page refresh
 - [ ] Example prompts populate input field
-- [ ] Single model responses display correctly
-- [ ] Comparison mode shows both responses side-by-side
+- [ ] Model responses display correctly
 - [ ] Clear history button removes all messages
 - [ ] Session maintains chat across browser refreshes
 - [ ] Console shows `[Chat]` logs with message tracking
 
-#### Model Comparison Dashboard
-- [ ] Metrics cards display data for both models
-- [ ] Metrics auto-update every 10 seconds
-- [ ] Plotly latency chart renders with dual lines
-- [ ] Plotly success rate chart displays correctly
-- [ ] Metrics table populates with request counts
-- [ ] Automated insights generate recommendations
-- [ ] Export JSON button downloads metrics file
-- [ ] Console shows `[Comparison]` logs with timing
+#### Debug Mode (/debug)
+- [ ] Page accessible by direct navigation to /debug
+- [ ] Not linked in any UI navigation
+- [ ] Tool testing interface functional
 
 #### Load Testing
 - [ ] Start load test button triggers test
@@ -315,13 +325,6 @@ This confirms automatic WSGI instrumentation is working.
 - [ ] Stop button appears and works when test active
 - [ ] Stats display: total requests, RPS, average response time
 - [ ] Console shows `[LoadTest]` logs with status
-
-#### Sidebar (All Pages)
-- [ ] Agent status updates every 30 seconds
-- [ ] Quick stats show request counts for both models
-- [ ] Mode navigation buttons work correctly
-- [ ] Resource links open in new tabs
-- [ ] Console shows `[Main]` logs for sidebar updates
 
 ### Performance Metrics
 
@@ -349,12 +352,12 @@ Console logs include performance measurements using `performance.now()`:
 ✅ **All services healthy:**
 ```bash
 docker-compose ps | grep -c "healthy"
-# Should output: 5 (ollama-model-a, ollama-model-b, ai-agent, mcp-server, target-app)
+# Should output: 4 (ollama-model-a, ollama-model-b, ai-agent, mcp-server)
 ```
 
 ✅ **Flask UI accessible:**
 ```bash
-curl -s http://localhost:8501 | grep "<title>AI Monitoring Demo</title>"
+curl -s http://localhost:8501 | grep "<title>New Relic AIM Demo</title>"
 ```
 
 ✅ **Console logging working:**
@@ -416,38 +419,25 @@ curl -s http://localhost:8501 | grep "<title>AI Monitoring Demo</title>"
 5. Add JavaScript in `static/js/`
 
 ### JavaScript Architecture
-- `main.js` - Global utilities (APIClient, PollingManager, sidebar updates)
+- `main.js` - Global utilities (APIClient, PollingManager)
 - `load_test.js` - Load testing controls
-- `repair.js` - Repair mode functionality
+- `tools.js` - Tool execution mode functionality
 - `chat.js` - Chat interface
-- `comparison.js` - Dashboard with Plotly charts
 
 ### State Management
 - Chat history stored in Flask session
 - Session lifetime: 24 hours
 - Session storage: Filesystem (upgradable to Redis)
 
-## Key Differences from Streamlit
-
-| Feature | Streamlit | Flask |
-|---------|-----------|-------|
-| Rendering | Auto-rerun | Server-side + AJAX |
-| Real-time | Built-in | Manual polling |
-| State | session_state | Flask sessions |
-| Charts | Python Plotly | Plotly.js (frontend) |
-| Deployment | Single process | Gunicorn multi-worker |
-| Browser Monitoring | Manual | Automatic (WSGI) |
-
 ## Browser Console Logging
 
 The application includes comprehensive instrumented logging for debugging and monitoring. All JavaScript modules output detailed logs with module-specific prefixes and performance timing.
 
 ### Log Prefixes
-- `[Main]` - Global utilities (APIClient, PollingManager, sidebar updates)
+- `[Main]` - Global utilities (APIClient, PollingManager)
 - `[APIClient]` - HTTP requests with timing and response data
-- `[Repair]` - Repair mode operations
+- `[Tools]` - Tool execution mode operations
 - `[Chat]` - Chat mode operations
-- `[Comparison]` - Dashboard and metrics operations
 - `[LoadTest]` - Load testing controls
 
 ### Example Console Output
@@ -456,16 +446,13 @@ The application includes comprehensive instrumented logging for debugging and mo
 [APIClient] Initialized with baseUrl:
 [Main] PollingManager initialized
 [Main] DOM loaded, initializing application
-[Main] Sidebar polling started (30s interval)
 [APIClient] GET request: /api/health
 [APIClient] GET /api/health completed in 45.23ms with status 200
 [Main] Agent status: Online (uptime: 2h 15m)
-[Repair] Initializing repair mode
-[Repair] Container status polling started (15s interval)
+[Tools] Initializing tools mode
+[Tools] System status polling started (15s interval)
 [Chat] Initializing chat mode
 [Chat] Loaded 5 messages from history
-[Comparison] Initializing dashboard
-[Comparison] Metrics polling started (10s interval)
 [LoadTest] Load test controls initialized
 ```
 

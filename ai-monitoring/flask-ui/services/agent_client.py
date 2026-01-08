@@ -3,8 +3,12 @@ Client for communicating with the AI Agent service.
 """
 
 import json
+import logging
+import time
 import requests
 from typing import Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class AgentClient:
@@ -40,41 +44,44 @@ class AgentClient:
         Returns:
             Repair result dictionary
         """
+        start_time = time.time()
+        url = f"{self.base_url}/repair"
+        timeout = 180
+
+        logger.info(f"[AGENT-CLIENT] Sending repair request - url={url}, model={model}, timeout={timeout}s")
+
         try:
             response = self.session.post(
-                f"{self.base_url}/repair",
+                url,
                 params={"model": model},
-                timeout=180
+                timeout=timeout
             )
+            elapsed = time.time() - start_time
+
+            logger.info(f"[AGENT-CLIENT] Received response - status={response.status_code}, elapsed={elapsed:.2f}s, model={model}")
+
             response.raise_for_status()
             return response.json()
-        except requests.Timeout:
-            return {"error": "Timeout: Repair workflow exceeded 3 minute limit"}
+
+        except requests.Timeout as e:
+            elapsed = time.time() - start_time
+            logger.error(f"[AGENT-CLIENT] Request TIMEOUT - elapsed={elapsed:.2f}s, timeout={timeout}s, model={model}, url={url}")
+            return {"error": f"Request timeout after {timeout}s: AI Agent did not respond in time"}
+
         except requests.ConnectionError as e:
+            elapsed = time.time() - start_time
+            logger.error(f"[AGENT-CLIENT] CONNECTION ERROR - elapsed={elapsed:.2f}s, model={model}, url={url}, error={str(e)}")
             return {"error": f"Connection failed: Unable to reach AI Agent service ({str(e)})"}
+
         except requests.HTTPError as e:
-            return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+            elapsed = time.time() - start_time
+            logger.error(f"[AGENT-CLIENT] HTTP ERROR - status={response.status_code}, elapsed={elapsed:.2f}s, model={model}, url={url}")
+            return {"error": f"HTTP error {response.status_code}: {str(e)}"}
+
         except Exception as e:
+            elapsed = time.time() - start_time
+            logger.error(f"[AGENT-CLIENT] UNEXPECTED ERROR - elapsed={elapsed:.2f}s, model={model}, url={url}, error={str(e)}", exc_info=True)
             return {"error": f"Unexpected error: {str(e)}"}
-
-    def compare_repairs(self) -> Dict[str, Any]:
-        """
-        Run repair with both models and compare.
-
-        Returns:
-            Comparison result dictionary
-        """
-        try:
-            response = self.session.post(
-                f"{self.base_url}/repair/compare",
-                timeout=360  # 6 minutes for both models
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.Timeout:
-            return {"error": "Comparison timed out after 6 minutes"}
-        except Exception as e:
-            return {"error": str(e)}
 
     def send_chat(self, message: str, model: str = "a") -> Dict[str, Any]:
         """
@@ -97,29 +104,6 @@ class AgentClient:
             return response.json()
         except requests.Timeout:
             return {"error": "Chat request timed out"}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def compare_chat(self, message: str) -> Dict[str, Any]:
-        """
-        Send the same message to both models and compare.
-
-        Args:
-            message: User message
-
-        Returns:
-            Comparison dictionary with both responses
-        """
-        try:
-            response = self.session.post(
-                f"{self.base_url}/chat/compare",
-                params={"message": message},
-                timeout=240
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.Timeout:
-            return {"error": "Chat comparison timed out"}
         except Exception as e:
             return {"error": str(e)}
 

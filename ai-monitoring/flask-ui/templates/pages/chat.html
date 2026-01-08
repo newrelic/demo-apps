@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Chat Assistant - AI Monitoring Demo{% endblock %}
+{% block title %}Chat Assistant - New Relic AIM Demo{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
@@ -8,15 +8,20 @@
 
 {% block content %}
 <div class="chat-container">
+    <!-- Navigation -->
+    <nav class="page-nav">
+        <a href="{{ url_for('main.index') }}" class="nav-btn">🏠 Home</a>
+        <a href="{{ url_for('tools.tools_mode') }}" class="nav-btn">🔧 Tools</a>
+    </nav>
+
     <h1>💬 Chat with AI Agent</h1>
 
     <!-- Model Selection -->
     <div class="config-section">
         <label for="chat-model-select">Select Model:</label>
         <select id="chat-model-select" class="form-control">
-            <option value="a">Model A (llama3.2:1b)</option>
-            <option value="b">Model B (qwen2.5:0.5b)</option>
-            <option value="compare">Compare Both</option>
+            <option value="a">Model A (mistral:7b-instruct-v0.3)</option>
+            <option value="b">Model B (ministral-3:8b q8_0)</option>
         </select>
     </div>
 
@@ -74,46 +79,6 @@
         </div>
     </details>
 
-    <hr>
-
-    <!-- Container Logs Viewer -->
-    <section class="logs-section">
-        <h2>📜 Container Logs</h2>
-        <p class="logs-help-text">Monitor what's happening as chat messages are processed:</p>
-
-        <div class="logs-guide">
-            <details>
-                <summary>💡 Which container should I check?</summary>
-                <ul class="container-guide-list">
-                    <li><strong>ai-agent:</strong> See chat requests arriving, model selection, and responses being formatted</li>
-                    <li><strong>ollama-model-a/b:</strong> See LLM inference happening (prompt processing, token generation)</li>
-                    <li><strong>mcp-server:</strong> See tool calls if agent uses Docker/Locust tools during chat</li>
-                    <li><strong>flask-ui:</strong> See HTTP requests from your browser to the Flask UI</li>
-                    <li><strong>target-app:</strong> See if agent queries the target application's status</li>
-                </ul>
-            </details>
-        </div>
-
-        <div class="logs-controls">
-            <select id="container-select" class="form-control">
-                <option value="aim-ai-agent" selected>ai-agent (chat processing)</option>
-                <option value="aim-ollama-model-a">ollama-model-a (LLM inference)</option>
-                <option value="aim-ollama-model-b">ollama-model-b (LLM inference)</option>
-                <option value="aim-mcp-server">mcp-server (tool calls)</option>
-                <option value="aim-target-app">target-app (system queries)</option>
-                <option value="aim-flask-ui">flask-ui (HTTP requests)</option>
-            </select>
-            <input type="number" id="log-lines" class="form-control" value="100" min="10" max="500">
-            <button id="fetch-logs-btn" class="btn btn-secondary">📖 Fetch Logs</button>
-        </div>
-        <div class="logs-filter">
-            <label class="checkbox-label">
-                <input type="checkbox" id="filter-health-checks" checked>
-                <span>Hide monitoring/polling logs (health checks, metrics, stats)</span>
-            </label>
-        </div>
-        <pre id="logs-display" style="display: none;"></pre>
-    </section>
 </div>
 {% endblock %}
 

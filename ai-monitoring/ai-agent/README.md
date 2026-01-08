@@ -5,7 +5,7 @@ Autonomous reasoning engine powered by PydanticAI that diagnoses and repairs sys
 ## Features
 
 - **Autonomous Repair Workflows**: Automatically detects failures, diagnoses issues, and takes corrective actions
-- **Dual Model Support**: A/B testing with two LLM models (llama3.2:1b and qwen2.5:0.5b)
+- **Dual Model Support**: A/B testing with two LLM models (mistral:7b-instruct and ministral-3:8b-instruct-2512-q8_0)
 - **MCP Tool Calling**: Integrates with MCP server for Docker container management and load testing
 - **Metrics Collection**: Tracks performance metrics for model comparison
 - **Chat Interface**: Interactive chat with system prompts and tool integration
@@ -67,13 +67,13 @@ Flask UI          AI Agent         Model Router      Ollama A/B       MCP Server
 Trigger repair workflow with specified model.
 
 **Query Parameters**:
-- `model` (required): `"a"` for llama3.2:1b or `"b"` for qwen2.5:0.5b
+- `model` (required): `"a"` for mistral:7b-instruct or `"b"` for ministral-3:8b-instruct-2512-q8_0
 
 **Response**:
 ```json
 {
   "success": true,
-  "model": "llama3.2:1b",
+  "model": "mistral:7b-instruct",
   "latency_seconds": 2.45,
   "reasoning": "Detected target-app container crashed...",
   "actions_taken": [
@@ -94,7 +94,7 @@ Run repair workflow with both models and compare results.
   "model_a": { /* RepairResult */ },
   "model_b": { /* RepairResult */ },
   "comparison": {
-    "faster_model": "qwen2.5:0.5b",
+    "faster_model": "ministral-3:8b-instruct-2512-q8_0",
     "latency_difference": 0.3
   }
 }
@@ -115,7 +115,7 @@ Interactive chat with the agent.
 ```json
 {
   "response": "The system is currently healthy. All 8 containers are running...",
-  "model": "llama3.2:1b",
+  "model": "mistral:7b-instruct",
   "latency_seconds": 0.52
 }
 ```
@@ -161,8 +161,8 @@ Detailed performance metrics for both models.
 ## Dependencies
 
 ### Upstream Services
-- **ollama-model-a** (Port 11434): Llama3.2:1b model for reasoning
-- **ollama-model-b** (Port 11435): Qwen2.5:0.5b model for reasoning
+- **ollama-model-a** (Port 11434): Mistral 7B Instruct model for reliable reasoning
+- **ollama-model-b** (Port 11435): Phi-3 Mini model for efficient reasoning
 - **mcp-server** (Port 8002): Tool interface for Docker and Locust control
 
 ### Downstream Services
@@ -189,8 +189,8 @@ pip install -r requirements.txt
 # Set environment variables
 export OLLAMA_MODEL_A_URL=http://localhost:11434/v1
 export OLLAMA_MODEL_B_URL=http://localhost:11435/v1
-export MODEL_A_NAME=llama3.2:1b
-export MODEL_B_NAME=qwen2.5:0.5b
+export MODEL_A_NAME=mistral:7b-instruct
+export MODEL_B_NAME=ministral-3:8b-instruct-2512-q8_0
 export MCP_SERVER_URL=http://localhost:8002
 export AGENT_PORT=8001
 
@@ -203,8 +203,8 @@ python app.py
 ====================================================================
 🤖 AI Agent Service Starting
 ====================================================================
-Model A: llama3.2:1b at http://ollama-model-a:11434/v1
-Model B: qwen2.5:0.5b at http://ollama-model-b:11434/v1
+Model A: mistral:7b-instruct at http://ollama-model-a:11434/v1
+Model B: ministral-3:8b-instruct-2512-q8_0 at http://ollama-model-b:11434/v1
 MCP Server: http://mcp-server:8002
 ====================================================================
 INFO:     Started server process [12345]
@@ -239,8 +239,8 @@ curl http://localhost:8001/metrics
 |----------|----------|---------|-------------|
 | `OLLAMA_MODEL_A_URL` | Yes | - | URL for Model A Ollama instance |
 | `OLLAMA_MODEL_B_URL` | Yes | - | URL for Model B Ollama instance |
-| `MODEL_A_NAME` | Yes | - | Model name (e.g., llama3.2:1b) |
-| `MODEL_B_NAME` | Yes | - | Model name (e.g., qwen2.5:0.5b) |
+| `MODEL_A_NAME` | Yes | - | Model name (e.g., mistral:7b-instruct) |
+| `MODEL_B_NAME` | Yes | - | Model name (e.g., ministral-3:8b-instruct-2512-q8_0) |
 | `MCP_SERVER_URL` | Yes | - | MCP server URL for tool calling |
 | `AGENT_PORT` | No | 8001 | Port to run agent service |
 | `NEW_RELIC_LICENSE_KEY` | No | - | New Relic ingest license key |

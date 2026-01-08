@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+
+{% block title %}Debug Tests - AI Monitoring Demo{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/debug.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="debug-container">
+    <h1>🔬 Debug & Diagnostics</h1>
+    <p>Test tools to diagnose PydanticAI hanging issues</p>
+
+    <hr style="margin: 20px 0;">
+
+    <!-- Test 1: Minimal Agent (No Tools) -->
+    <section class="test-section" style="margin-bottom: 30px;">
+        <h2>Test 1: Minimal Agent (No Tools)</h2>
+        <p style="color: #666; font-size: 14px;">
+            Tests a PydanticAI agent with <strong>NO tools attached</strong>.
+            If this hangs, the issue is in PydanticAI itself, not tool registration.
+        </p>
+
+        <div style="margin: 15px 0;">
+            <label style="display: block; margin-bottom: 5px;">Model:</label>
+            <select id="test1-model" style="padding: 8px; width: 200px; margin-right: 10px;">
+                <option value="a">Model A (Mistral 7B)</option>
+                <option value="b">Model B (Ministral 3)</option>
+            </select>
+
+            <label style="display: block; margin: 10px 0 5px 0;">Message:</label>
+            <input type="text" id="test1-message" value="Hello, can you respond?"
+                   style="padding: 8px; width: 100%; max-width: 500px; margin-bottom: 10px;">
+
+            <br>
+            <button id="test1-btn" class="btn btn-primary" style="margin-top: 10px;">Run Test 1</button>
+        </div>
+
+        <div id="test1-result" class="test-result" style="display: none;">
+            <h3>Result:</h3>
+            <pre id="test1-output"></pre>
+        </div>
+    </section>
+
+    <hr style="margin: 30px 0;">
+
+    <!-- Test 2: Direct LLM Call -->
+    <section class="test-section" style="margin-bottom: 30px;">
+        <h2>Test 2: Direct LLM Call (Bypass PydanticAI)</h2>
+        <p style="color: #666; font-size: 14px;">
+            Calls Ollama directly via HTTP, completely bypassing PydanticAI.
+            If this works but Test 1 hangs, the issue is definitely in PydanticAI.
+        </p>
+
+        <div style="margin: 15px 0;">
+            <label style="display: block; margin-bottom: 5px;">Model:</label>
+            <select id="test2-model" style="padding: 8px; width: 200px; margin-right: 10px;">
+                <option value="a">Model A (Mistral 7B)</option>
+                <option value="b">Model B (Ministral 3)</option>
+            </select>
+
+            <br>
+            <button id="test2-btn" class="btn btn-primary" style="margin-top: 10px;">Run Test 2</button>
+        </div>
+
+        <div id="test2-result" class="test-result" style="display: none;">
+            <h3>Result:</h3>
+            <pre id="test2-output"></pre>
+        </div>
+    </section>
+
+    <hr style="margin: 30px 0;">
+
+    <!-- Test 3: Minimal Repair (2 Tools Only) -->
+    <section class="test-section" style="margin-bottom: 30px;">
+        <h2>Test 3: Minimal Repair (Only 2 Tools)</h2>
+        <p style="color: #666; font-size: 14px;">
+            Tests a repair agent with <strong>ONLY 2 tools</strong> (docker_ps + docker_restart) and a short prompt (~200 tokens).
+            If this works but full repair fails, the issue is context/compute limitations.
+        </p>
+
+        <div style="margin: 15px 0;">
+            <label style="display: block; margin-bottom: 5px;">Model:</label>
+            <select id="test3-model" style="padding: 8px; width: 200px; margin-right: 10px;">
+                <option value="a">Model A (Mistral 7B)</option>
+                <option value="b">Model B (Ministral 3)</option>
+            </select>
+
+            <br>
+            <button id="test3-btn" class="btn btn-primary" style="margin-top: 10px;">Run Test 3</button>
+            <span id="test3-spinner" style="display: none; margin-left: 10px;">⏳ Running (may take 60-120s)...</span>
+        </div>
+
+        <div id="test3-result" class="test-result" style="display: none;">
+            <h3>Result:</h3>
+            <pre id="test3-output"></pre>
+        </div>
+    </section>
+
+    <hr style="margin: 30px 0;">
+
+    <!-- Test 4: Manual Tool Orchestration -->
+    <section class="test-section" style="margin-bottom: 30px;">
+        <h2>Test 4: Manual Tool Orchestration</h2>
+        <p style="color: #666; font-size: 14px;">
+            <strong>Bypasses PydanticAI entirely</strong>. Directly calls Ollama, parses tool calls from text, executes them, and feeds results back in a loop.
+            This works around Ollama's lack of OpenAI-style function calling support.
+            <br><br>
+            <em>Use this when Test 3 shows 0 tool calls (model responds with text instead of executing tools).</em>
+        </p>
+
+        <div style="margin: 15px 0;">
+            <label style="display: block; margin-bottom: 5px;">Model:</label>
+            <select id="test4-model" style="padding: 8px; width: 200px; margin-right: 10px;">
+                <option value="a">Model A (Mistral 7B)</option>
+                <option value="b">Model B (Ministral 3)</option>
+            </select>
+
+            <br>
+            <button id="test4-btn" class="btn btn-primary" style="margin-top: 10px;">Run Test 4</button>
+            <span id="test4-spinner" style="display: none; margin-left: 10px;">⏳ Running (may take 60-120s)...</span>
+        </div>
+
+        <div id="test4-result" class="test-result" style="display: none;">
+            <h3>Result:</h3>
+            <pre id="test4-output"></pre>
+        </div>
+    </section>
+
+    <hr style="margin: 30px 0;">
+
+    <!-- Instructions -->
+    <section class="interpretation-guide">
+        <h3>📋 Interpretation Guide</h3>
+        <ul>
+            <li><strong>All tests succeed:</strong> PydanticAI and tools work! Full repair likely needs more context/compute or has prompt issues.</li>
+            <li><strong>Tests 1-2 work, Test 3 fails:</strong> Issue is with tool registration or tool execution in repair context.</li>
+            <li><strong>Test 3 shows 0 tools, Test 4 works:</strong> Ollama doesn't support function calling. Use Test 4's manual orchestration approach.</li>
+            <li><strong>Test 3 works, full repair fails:</strong> Context window too small (need 8192+ tokens) or prompt too complex.</li>
+            <li><strong>Test 1 hangs, Test 2 works:</strong> PydanticAI has a deadlock. Check library version or async configuration.</li>
+            <li><strong>All tests hang/fail:</strong> Ollama model is stuck or not responding. Check ollama-model-a/b container logs.</li>
+        </ul>
+    </section>
+</div>
+
+<script>
+// Test 1: Minimal Agent
+document.getElementById('test1-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('test1-btn');
+    const resultDiv = document.getElementById('test1-result');
+    const outputPre = document.getElementById('test1-output');
+
+    const model = document.getElementById('test1-model').value;
+    const message = document.getElementById('test1-message').value;
+
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    resultDiv.style.display = 'none';
+
+    try {
+        const response = await fetch('/debug/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({model, message})
+        });
+
+        const result = await response.json();
+        outputPre.textContent = JSON.stringify(result, null, 2);
+        resultDiv.style.display = 'block';
+
+        if (result.success) {
+            outputPre.style.borderLeft = '4px solid #28a745';
+        } else {
+            outputPre.style.borderLeft = '4px solid #dc3545';
+        }
+    } catch (error) {
+        outputPre.textContent = `Error: ${error.message}`;
+        outputPre.style.borderLeft = '4px solid #dc3545';
+        resultDiv.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Test 1';
+    }
+});
+
+// Test 2: Direct LLM
+document.getElementById('test2-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('test2-btn');
+    const resultDiv = document.getElementById('test2-result');
+    const outputPre = document.getElementById('test2-output');
+
+    const model = document.getElementById('test2-model').value;
+
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    resultDiv.style.display = 'none';
+
+    try {
+        const response = await fetch('/debug/direct-llm', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({model})
+        });
+
+        const result = await response.json();
+        outputPre.textContent = JSON.stringify(result, null, 2);
+        resultDiv.style.display = 'block';
+
+        if (result.success) {
+            outputPre.style.borderLeft = '4px solid #28a745';
+        } else {
+            outputPre.style.borderLeft = '4px solid #dc3545';
+        }
+    } catch (error) {
+        outputPre.textContent = `Error: ${error.message}`;
+        outputPre.style.borderLeft = '4px solid #dc3545';
+        resultDiv.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Test 2';
+    }
+});
+
+// Test 3: Minimal Repair
+document.getElementById('test3-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('test3-btn');
+    const spinner = document.getElementById('test3-spinner');
+    const resultDiv = document.getElementById('test3-result');
+    const outputPre = document.getElementById('test3-output');
+
+    const model = document.getElementById('test3-model').value;
+
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    spinner.style.display = 'inline';
+    resultDiv.style.display = 'none';
+
+    try {
+        const response = await fetch(`{{ url_for('api.agent_minimal_repair') }}?model=${model}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+
+        const result = await response.json();
+        outputPre.textContent = JSON.stringify(result, null, 2);
+        resultDiv.style.display = 'block';
+
+        if (result.success) {
+            outputPre.style.borderLeft = '4px solid #28a745';
+        } else {
+            outputPre.style.borderLeft = '4px solid #dc3545';
+        }
+    } catch (error) {
+        outputPre.textContent = `Error: ${error.message}`;
+        outputPre.style.borderLeft = '4px solid #dc3545';
+        resultDiv.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Test 3';
+        spinner.style.display = 'none';
+    }
+});
+
+// Test 4: Manual Tool Orchestration
+document.getElementById('test4-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('test4-btn');
+    const spinner = document.getElementById('test4-spinner');
+    const resultDiv = document.getElementById('test4-result');
+    const outputPre = document.getElementById('test4-output');
+
+    const model = document.getElementById('test4-model').value;
+
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    spinner.style.display = 'inline';
+    resultDiv.style.display = 'none';
+
+    try {
+        const response = await fetch(`{{ url_for('api.agent_manual_repair') }}?model=${model}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+
+        const result = await response.json();
+        outputPre.textContent = JSON.stringify(result, null, 2);
+        resultDiv.style.display = 'block';
+
+        if (result.success) {
+            outputPre.style.borderLeft = '4px solid #28a745';
+        } else {
+            outputPre.style.borderLeft = '4px solid #dc3545';
+        }
+    } catch (error) {
+        outputPre.textContent = `Error: ${error.message}`;
+        outputPre.style.borderLeft = '4px solid #dc3545';
+        resultDiv.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Test 4';
+        spinner.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

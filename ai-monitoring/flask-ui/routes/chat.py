@@ -42,30 +42,6 @@ def send_message():
     return jsonify(result)
 
 
-@bp.route('/compare', methods=['POST'])
-def compare_chat():
-    """Send to both models for comparison."""
-    agent_client = get_agent_client()
-    data = request.get_json()
-    message = data.get('message', '')
-
-    # Add user message to history
-    add_chat_message('user', message)
-
-    # Get comparison result
-    result = agent_client.compare_chat(message)
-
-    if 'error' not in result:
-        # Add both responses to history
-        model_a_response = result.get('model_a', {}).get('response', '')
-        model_b_response = result.get('model_b', {}).get('response', '')
-
-        add_chat_message('assistant', f"[Model A] {model_a_response}", 'Model A')
-        add_chat_message('assistant', f"[Model B] {model_b_response}", 'Model B')
-
-    return jsonify(result)
-
-
 @bp.route('/clear', methods=['POST'])
 def clear_history():
     """Clear chat history from session."""

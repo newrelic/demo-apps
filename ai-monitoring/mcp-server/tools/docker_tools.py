@@ -98,7 +98,7 @@ def docker_ps() -> str:
                 "uptime": uptime
             })
 
-        logger.info(f"Listed {len(result)} containers")
+        logger.debug(f"Listed {len(result)} containers")
         return json.dumps(result, indent=2)
 
     except Exception as e:

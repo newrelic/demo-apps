@@ -26,6 +26,7 @@ class RepairResult(BaseModel):
     model_used: str
     latency_seconds: float
     tool_calls: List[ToolCall] = Field(default_factory=list)
+    ai_reasoning: Optional[str] = None  # LLM analysis/reasoning for why tools were selected
     timestamp: datetime = Field(default_factory=datetime.now)
 
 
