@@ -13,7 +13,9 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
+import newrelic.agent
 
+from httpx_instrumentation import apply_httpx_patch
 from agent import (
     run_repair_workflow,
     run_minimal_repair_workflow,
@@ -46,6 +48,39 @@ logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
 # Track service start time
 start_time = time.time()
 
+# Token counting cache for New Relic callback
+_token_cache = {}
+
+
+def ollama_token_count_callback(model: str, content: str) -> int:
+    """
+    New Relic callback to provide token counts for LLM calls.
+
+    Since Ollama provides token counts in responses (unlike some APIs),
+    we use a cache mechanism: store tokens when we get the response,
+    then return them when NR calls this callback.
+
+    Args:
+        model: LLM model name (e.g., "mistral:7b-instruct")
+        content: Message content/prompt
+
+    Returns:
+        Token count or None if not available
+    """
+    # Create cache key from model + content hash
+    cache_key = f"{model}:{hash(content)}"
+    token_count = _token_cache.get(cache_key)
+
+    if token_count is not None:
+        logger.debug(f"[TOKEN CALLBACK] Returning {token_count} tokens for {model}")
+        return token_count
+
+    # Fallback: rough estimate based on character count
+    # OpenAI rule of thumb: ~4 chars per token
+    estimated = len(content) // 4
+    logger.debug(f"[TOKEN CALLBACK] Estimating {estimated} tokens for {model} (no cached data)")
+    return estimated
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -57,6 +92,21 @@ async def lifespan(app: FastAPI):
     logger.info(f"Model B: {os.getenv('MODEL_B_NAME')} at {os.getenv('OLLAMA_MODEL_B_URL')}")
     logger.info(f"MCP Server: {os.getenv('MCP_SERVER_URL')}")
     logger.info("=" * 60)
+
+    # Register New Relic token counting callback
+    try:
+        application = newrelic.agent.register_application(timeout=10.0)
+        newrelic.agent.set_llm_token_count_callback(ollama_token_count_callback, application)
+        logger.info("✅ New Relic token count callback registered")
+    except Exception as e:
+        logger.warning(f"⚠️  Failed to register NR token callback: {e}")
+
+    # Apply httpx monkey-patch to capture PydanticAI tokens
+    try:
+        apply_httpx_patch()
+    except Exception as e:
+        logger.warning(f"⚠️  Failed to apply httpx patch: {e}")
+
     yield
     logger.info("AI Agent Service shutting down...")
 

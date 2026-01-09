@@ -9,6 +9,7 @@ import logging
 import time
 import asyncio
 import httpx
+import newrelic.agent
 from typing import Literal
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -68,6 +69,76 @@ async def call_mcp_tool(tool_path: str, method: str = "GET", data: dict = None) 
         logger.error(f"[DEBUG] MCP tool call exception: {type(e).__name__}")
         logger.error(f"MCP tool call failed: {e}")
         return f"Error calling tool: {str(e)}"
+
+
+def record_llm_tokens(model_name: str, prompt: str, response_data: dict, latency_ms: float) -> dict:
+    """
+    Extract token usage from Ollama response and record to New Relic.
+
+    Args:
+        model_name: Name of the LLM model used
+        prompt: The prompt/message sent to the LLM
+        response_data: Full JSON response from Ollama API
+        latency_ms: Request latency in milliseconds
+
+    Returns:
+        Dictionary with token usage stats
+    """
+    usage = response_data.get("usage", {})
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+    total_tokens = usage.get("total_tokens", 0)
+
+    # Store in cache for callback (import from app.py)
+    try:
+        from app import _token_cache
+        cache_key = f"{model_name}:{hash(prompt)}"
+        _token_cache[cache_key] = prompt_tokens
+
+        # Also cache the response for completion tokens
+        response_content = response_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if response_content:
+            response_cache_key = f"{model_name}:{hash(response_content)}"
+            _token_cache[response_cache_key] = completion_tokens
+    except ImportError:
+        logger.warning("Could not import _token_cache from app.py")
+
+    # 1. PRIMARY: Use official New Relic LLM recording API
+    try:
+        newrelic.agent.record_llm_chat_completion_summary(
+            model=model_name,
+            input_tokens=prompt_tokens,
+            output_tokens=completion_tokens,
+            llm_vendor='ollama',  # Mark as custom vendor (critical!)
+            response_time_ms=latency_ms,
+        )
+        logger.info(f"[NR-LLM] Recorded LLM call: model={model_name}, vendor=ollama, tokens={total_tokens}")
+    except Exception as e:
+        logger.warning(f"Failed to record LLM summary: {e}")
+
+    # 2. SECONDARY: Set span attributes for distributed tracing visibility
+    try:
+        txn = newrelic.agent.current_transaction()
+        if txn:
+            txn.add_custom_attribute('llm.model', model_name)
+            txn.add_custom_attribute('llm.vendor', 'ollama')
+            txn.add_custom_attribute('llm.vendor.custom', True)
+            txn.add_custom_attribute('llm.prompt_tokens', prompt_tokens)
+            txn.add_custom_attribute('llm.completion_tokens', completion_tokens)
+            txn.add_custom_attribute('llm.total_tokens', total_tokens)
+            txn.add_custom_attribute('llm.request_type', 'chat_completion')
+            logger.debug(f"[NR-SPAN] Set LLM attributes on transaction span")
+    except Exception as e:
+        logger.warning(f"Failed to set span attributes: {e}")
+
+    # 3. KEEP: Original token logging for visibility
+    logger.info(f"[TOKENS] {model_name}: {prompt_tokens}p + {completion_tokens}c = {total_tokens}t ({latency_ms:.0f}ms)")
+
+    return {
+        'prompt_tokens': prompt_tokens,
+        'completion_tokens': completion_tokens,
+        'total_tokens': total_tokens
+    }
 
 
 # ===== Model Instantiation =====
@@ -332,10 +403,15 @@ async def run_repair_workflow(model: Literal["a", "b"] = "a") -> RepairResult:
                 timeout=60.0  # Increased from 30s to 60s for slower models
             )
             llm_latency = time.time() - llm_start
+            llm_latency_ms = llm_latency * 1000
 
             if response.status_code == 200:
                 llm_response = response.json()
                 ai_response = llm_response.get("choices", [{}])[0].get("message", {}).get("content", "AI analysis completed")
+
+                # Extract and record token usage
+                token_stats = record_llm_tokens(model_name, prompt, llm_response, llm_latency_ms)
+
                 logger.info(f"[WORKFLOW] LLM response received in {llm_latency:.2f}s")
                 logger.info(f"[WORKFLOW] AI Analysis: {ai_response[:100]}...")
             else:
@@ -414,6 +490,10 @@ async def run_repair_workflow(model: Literal["a", "b"] = "a") -> RepairResult:
             / metrics.total_requests
         )
 
+        # Update token counts in metrics
+        if 'token_stats' in locals():
+            metrics.total_tokens += token_stats.get('total_tokens', 0)
+
         logger.info(f"Repair workflow completed in {total_latency:.2f}s with {len(tool_calls)} tool calls")
 
         return RepairResult(
@@ -488,6 +568,7 @@ Task: Check if api-gateway service is running properly. If not, restart it."""
     actions_taken = []
     containers_restarted = []
     max_iterations = 5
+    total_tokens_used = 0
 
     try:
         import json
@@ -495,6 +576,7 @@ Task: Check if api-gateway service is running properly. If not, restart it."""
 
         for iteration in range(max_iterations):
             logger.info(f"[MANUAL-MINIMAL] Iteration {iteration + 1}/{max_iterations}")
+            iteration_start = time.time()
 
             # Call Ollama
             async with httpx.AsyncClient(timeout=120.0) as client:
@@ -513,6 +595,13 @@ Task: Check if api-gateway service is running properly. If not, restart it."""
 
             result = response.json()
             assistant_message = result["choices"][0]["message"]["content"]
+
+            # Record token usage
+            latency_ms = (time.time() - iteration_start) * 1000
+            last_user_message = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+            token_stats = record_llm_tokens(model_name, last_user_message, result, latency_ms)
+            total_tokens_used += token_stats.get('total_tokens', 0)
+
             logger.info(f"[MANUAL-MINIMAL] Model response (first 300 chars): {assistant_message[:300]}")
 
             # Add assistant response to conversation
@@ -591,6 +680,7 @@ Task: Check if api-gateway service is running properly. If not, restart it."""
 
         metrics.total_requests += 1
         metrics.successful_requests += 1
+        metrics.total_tokens += total_tokens_used
 
         logger.info(f"[MANUAL-MINIMAL] Completed in {latency:.2f}s with {len(tool_calls_executed)} tool calls")
 
@@ -830,6 +920,9 @@ async def run_chat(message: str, model: Literal["a", "b"] = "a") -> tuple[str, f
     model_name = MODEL_A_NAME if model == "a" else MODEL_B_NAME
     metrics = model_a_metrics if model == "a" else model_b_metrics
 
+    # Track tokens captured by httpx monkey-patch
+    initial_tokens = metrics.total_tokens
+
     logger.info(f"Chat request to Model {model.upper()}: {message[:50]}...")
 
     try:
@@ -844,7 +937,9 @@ async def run_chat(message: str, model: Literal["a", "b"] = "a") -> tuple[str, f
             / metrics.total_requests
         )
 
-        logger.info(f"Chat completed in {latency:.2f}s")
+        # Calculate tokens captured by httpx monkey-patch
+        tokens_used = metrics.total_tokens - initial_tokens
+        logger.info(f"Chat completed in {latency:.2f}s (tokens captured via httpx patch: {tokens_used})")
         return result.output, latency
 
     except Exception as e:
@@ -871,6 +966,8 @@ async def run_debug_test(message: str, model: Literal["a", "b"] = "a") -> dict:
     start_time = time.time()
     agent = debug_agent_a if model == "a" else debug_agent_b
     model_name = MODEL_A_NAME if model == "a" else MODEL_B_NAME
+    metrics = model_a_metrics if model == "a" else model_b_metrics
+    initial_tokens = metrics.total_tokens
 
     try:
         logger.info(f"[DEBUG-TEST] Calling agent.run() with 30 second timeout")
@@ -888,13 +985,15 @@ async def run_debug_test(message: str, model: Literal["a", "b"] = "a") -> dict:
             }
 
         latency = time.time() - start_time
-        logger.info(f"[DEBUG-TEST] Completed successfully in {latency:.2f}s")
+        tokens_used = metrics.total_tokens - initial_tokens
+        logger.info(f"[DEBUG-TEST] Completed successfully in {latency:.2f}s (tokens: {tokens_used})")
 
         return {
             "success": True,
             "response": str(result.output),
             "model": model_name,
-            "latency_seconds": latency
+            "latency_seconds": latency,
+            "tokens_used": tokens_used
         }
 
     except Exception as e:
@@ -940,10 +1039,16 @@ async def run_direct_llm_test(model: Literal["a", "b"] = "a") -> dict:
             )
 
         latency = time.time() - start_time
+        latency_ms = latency * 1000
 
         if response.status_code == 200:
             result = response.json()
             message_content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            # Record token usage
+            prompt = "Say hello in one sentence."
+            token_stats = record_llm_tokens(model_name, prompt, result, latency_ms)
+
             logger.info(f"[DIRECT-LLM-TEST] Success in {latency:.2f}s")
 
             return {
@@ -951,7 +1056,8 @@ async def run_direct_llm_test(model: Literal["a", "b"] = "a") -> dict:
                 "response": message_content,
                 "model": model_name,
                 "latency_seconds": latency,
-                "raw_status": response.status_code
+                "raw_status": response.status_code,
+                "token_stats": token_stats
             }
         else:
             logger.error(f"[DIRECT-LLM-TEST] HTTP error: {response.status_code}")
