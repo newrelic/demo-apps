@@ -2,6 +2,9 @@
 
 console.log('[Chat] Initializing chat mode');
 
+// Store prompts globally
+let availablePrompts = [];
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[Chat] DOM loaded, setting up chat controls');
     const chatInput = document.getElementById('chat-input');
@@ -10,14 +13,90 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatHistory = document.getElementById('chat-history');
     const modelSelect = document.getElementById('chat-model-select');
 
-    // Example prompts
-    document.querySelectorAll('.example-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const prompt = btn.dataset.prompt;
-            console.log('[Chat] Example prompt clicked:', prompt);
-            chatInput.value = prompt;
-            sendBtn.click();
-        });
+    // Prompt selection elements
+    const promptSelect = document.getElementById('prompt-select');
+    const loadPromptBtn = document.getElementById('load-prompt-btn');
+    const randomPromptBtn = document.getElementById('random-prompt-btn');
+    const promptPreview = document.getElementById('prompt-preview');
+    const promptCategory = document.getElementById('prompt-category');
+    const promptDescription = document.getElementById('prompt-description');
+    const promptText = document.getElementById('prompt-text');
+
+    // Load prompts on page load
+    loadPrompts();
+
+    // Load prompts from API
+    async function loadPrompts() {
+        try {
+            console.log('[Chat] Loading prompts from API...');
+            const response = await api.get('/chat/prompts');
+
+            if (response.success && response.prompts) {
+                availablePrompts = response.prompts;
+                console.log(`[Chat] Loaded ${availablePrompts.length} prompts`);
+
+                // Populate dropdown
+                promptSelect.innerHTML = '<option value="">-- Select a prompt --</option>';
+                availablePrompts.forEach((p, idx) => {
+                    const option = document.createElement('option');
+                    option.value = idx;
+                    option.textContent = `[${p.category}] ${p.preview}`;
+                    promptSelect.appendChild(option);
+                });
+            } else {
+                console.error('[Chat] Failed to load prompts:', response.error);
+                promptSelect.innerHTML = '<option value="">Error loading prompts</option>';
+            }
+        } catch (error) {
+            console.error('[Chat] Error loading prompts:', error);
+            promptSelect.innerHTML = '<option value="">Error loading prompts</option>';
+        }
+    }
+
+    // Preview prompt when selection changes
+    promptSelect.addEventListener('change', () => {
+        const idx = parseInt(promptSelect.value);
+        if (isNaN(idx) || idx < 0 || idx >= availablePrompts.length) {
+            promptPreview.style.display = 'none';
+            return;
+        }
+
+        const prompt = availablePrompts[idx];
+        promptCategory.textContent = prompt.category;
+        promptDescription.textContent = prompt.description;
+        promptText.textContent = prompt.prompt;
+        promptPreview.style.display = 'block';
+
+        console.log('[Chat] Prompt preview:', prompt.category);
+    });
+
+    // Load selected prompt into input
+    loadPromptBtn.addEventListener('click', () => {
+        const idx = parseInt(promptSelect.value);
+        if (isNaN(idx) || idx < 0 || idx >= availablePrompts.length) {
+            alert('Please select a prompt first');
+            return;
+        }
+
+        const prompt = availablePrompts[idx];
+        chatInput.value = prompt.prompt;
+        console.log('[Chat] Loaded prompt into input:', prompt.category);
+    });
+
+    // Load random prompt
+    randomPromptBtn.addEventListener('click', () => {
+        if (availablePrompts.length === 0) {
+            alert('No prompts available');
+            return;
+        }
+
+        const randomIdx = Math.floor(Math.random() * availablePrompts.length);
+        promptSelect.value = randomIdx;
+        promptSelect.dispatchEvent(new Event('change'));
+
+        const prompt = availablePrompts[randomIdx];
+        chatInput.value = prompt.prompt;
+        console.log('[Chat] Random prompt loaded:', prompt.category);
     });
 
     // Send message

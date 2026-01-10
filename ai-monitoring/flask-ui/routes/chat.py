@@ -5,6 +5,7 @@ Chat Mode routes - Interactive chat assistant.
 from flask import Blueprint, render_template, jsonify, request, current_app
 from services.agent_client import AgentClient
 from utils.session_helpers import set_current_mode, get_chat_history, add_chat_message, clear_chat_history
+import requests
 
 bp = Blueprint('chat', __name__)
 
@@ -47,3 +48,44 @@ def clear_history():
     """Clear chat history from session."""
     clear_chat_history()
     return jsonify({'success': True})
+
+
+@bp.route('/prompts', methods=['GET'])
+def get_prompts():
+    """
+    Get list of available prompts from the AI agent.
+
+    Fetches prompts from the ai-agent service via API call.
+    """
+    agent_url = current_app.config['AGENT_URL']
+
+    try:
+        # Fetch prompts from AI agent API
+        response = requests.get(f"{agent_url}/prompts", timeout=5)
+
+        if response.status_code == 200:
+            data = response.json()
+            return jsonify({
+                'success': True,
+                'prompts': data.get('prompts', []),
+                'total': data.get('total', 0)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'AI agent returned status {response.status_code}',
+                'prompts': []
+            }), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to fetch prompts from AI agent: {str(e)}',
+            'prompts': []
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Unexpected error: {str(e)}',
+            'prompts': []
+        }), 500

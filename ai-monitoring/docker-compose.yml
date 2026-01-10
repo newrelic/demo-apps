@@ -149,25 +149,32 @@ services:
       - aim-network
     restart: unless-stopped
 
-  # Locust - Load generation for New Relic telemetry
+  # Locust - Passive load generation for New Relic telemetry
+  # Automatically generates 5-10 requests/hour with comprehensive prompt pool
+  # Includes MCP tool tests, chat, errors, boundaries, and abusive language scenarios
   locust:
     build:
-      context: ./locust-tests
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: locust-tests/Dockerfile
     container_name: aim-locust
     ports:
-      - "8089:8089"
+      - "8089:8089"  # Web UI still available for manual testing
     environment:
       - FLASK_UI_URL=${FLASK_UI_URL}
       - AI_AGENT_URL=${AI_AGENT_URL}
       - LOCUST_WEB_PORT=${LOCUST_WEB_PORT}
     command: >
+      --autostart
       --web-host 0.0.0.0
       --web-port 8089
-      --host http://flask-ui:8501
+      --host http://ai-agent:8001
+      --users 1
+      --spawn-rate 1
+      --run-time 876000h
+      PassiveLoadUser
     depends_on:
-      flask-ui:
-        condition: service_started
+      ai-agent:
+        condition: service_healthy
     networks:
       - aim-network
     restart: unless-stopped

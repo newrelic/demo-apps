@@ -1,310 +1,183 @@
 """
-Locust load tests with A/B model comparison.
+Locust passive load generation for AI monitoring demo.
 
-This file defines load testing scenarios including:
-1. Flask UI traffic simulation
-2. A/B testing for Model A vs Model B agent performance
-3. Chat interface load testing
+This file defines passive background traffic for:
+1. Realistic AI monitoring data in New Relic
+2. A/B model comparison with feedback events
+3. Diverse prompt testing (MCP, chat, errors, boundaries)
+
+Configured for 5-10 requests per hour for continuous demo data.
 """
 
 import os
 import random
-from locust import HttpUser, task, between, constant_pacing
+
+from locust import HttpUser, task, constant_pacing
+
+# Import comprehensive prompt pool (copied during Docker build)
+try:
+    from prompt_pool import get_weighted_random_prompt, get_prompt_stats
+    print("[LOCUST] Loaded prompt pool:", get_prompt_stats())
+except ImportError as e:
+    print(f"[LOCUST] WARNING: Could not import prompt_pool: {e}")
+    print("[LOCUST] Falling back to basic prompts")
 
 # Configuration
 AI_AGENT_URL = os.getenv("AI_AGENT_URL", "http://ai-agent:8001")
 FLASK_UI_URL = os.getenv("FLASK_UI_URL", "http://flask-ui:8501")
 
 
-# NOTE: TargetAppUser class removed - target-app service no longer exists in current architecture
-# Current architecture focuses on Flask UI and AI Agent services
-
-
-class ModelAUser(HttpUser):
-    """
-    User class that triggers AI agent repairs using Model A (Llama 3.2 3B).
-
-    This simulates monitoring traffic where Model A is used for diagnostics.
-    50% of AI agent traffic uses Model A.
-    """
-    host = AI_AGENT_URL
-    wait_time = constant_pacing(30)  # Run every 30 seconds
-
-    @task
-    def check_system_health_model_a(self):
-        """
-        Periodically check system health and trigger repairs with Model A.
-
-        This simulates an automated monitoring workflow using the smaller, faster model.
-        """
-        with self.client.get("/status", catch_response=True, name="Agent Status (Model A)") as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Status check failed: {response.status_code}")
-
-        # Occasionally trigger a repair workflow (20% of the time)
-        if random.random() < 0.2:
-            with self.client.post(
-                "/repair?model=a",
-                catch_response=True,
-                name="Repair Workflow (Model A)",
-                timeout=120  # Repairs can take time
-            ) as response:
-                if response.status_code == 200:
-                    result = response.json()
-                    if result.get("success"):
-                        response.success()
-                    else:
-                        response.failure(f"Repair failed: {result.get('final_status')}")
-                else:
-                    response.failure(f"Repair request failed: {response.status_code}")
-
-
-class ModelBUser(HttpUser):
-    """
-    User class that triggers AI agent repairs using Model B (Llama 3.1 8B).
-
-    This simulates monitoring traffic where Model B is used for diagnostics.
-    50% of AI agent traffic uses Model B.
-    """
-    host = AI_AGENT_URL
-    wait_time = constant_pacing(30)  # Run every 30 seconds
-
-    @task
-    def check_system_health_model_b(self):
-        """
-        Periodically check system health and trigger repairs with Model B.
-
-        This simulates an automated monitoring workflow using the larger, more capable model.
-        """
-        with self.client.get("/status", catch_response=True, name="Agent Status (Model B)") as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Status check failed: {response.status_code}")
-
-        # Occasionally trigger a repair workflow (20% of the time)
-        if random.random() < 0.2:
-            with self.client.post(
-                "/repair?model=b",
-                catch_response=True,
-                name="Repair Workflow (Model B)",
-                timeout=120  # Repairs can take time
-            ) as response:
-                if response.status_code == 200:
-                    result = response.json()
-                    if result.get("success"):
-                        response.success()
-                    else:
-                        response.failure(f"Repair failed: {result.get('final_status')}")
-                else:
-                    response.failure(f"Repair request failed: {response.status_code}")
-
-
-class ChatModelAUser(HttpUser):
-    """
-    User class that sends chat messages to Model A.
-
-    This simulates users interacting with the chat interface using Model A.
-    """
-    host = AI_AGENT_URL
-    wait_time = constant_pacing(45)  # Chat every 45 seconds
-
-    @task
-    def send_chat_message_model_a(self):
-        """Send a chat message to Model A."""
-        messages = [
-            "What is the current system status?",
-            "How many containers are running?",
-            "Tell me about the target application.",
-            "What tools do you have access to?",
-            "How do you diagnose failures?"
-        ]
-
-        message = random.choice(messages)
-
-        with self.client.post(
-            "/chat",
-            json={"message": message, "model": "a"},
-            catch_response=True,
-            name="Chat (Model A)",
-            timeout=60
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Chat failed: {response.status_code}")
-
-
-class ChatModelBUser(HttpUser):
-    """
-    User class that sends chat messages to Model B.
-
-    This simulates users interacting with the chat interface using Model B.
-    """
-    host = AI_AGENT_URL
-    wait_time = constant_pacing(45)  # Chat every 45 seconds
-
-    @task
-    def send_chat_message_model_b(self):
-        """Send a chat message to Model B."""
-        messages = [
-            "What is the current system status?",
-            "How many containers are running?",
-            "Tell me about the target application.",
-            "What tools do you have access to?",
-            "How do you diagnose failures?"
-        ]
-
-        message = random.choice(messages)
-
-        with self.client.post(
-            "/chat",
-            json={"message": message, "model": "b"},
-            catch_response=True,
-            name="Chat (Model B)",
-            timeout=60
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Chat failed: {response.status_code}")
-
-
-# ===== Prompt Pools for PassiveLoadUser =====
-
-# Tool-invoking prompts (40%) - trigger MCP tool usage
-TOOL_PROMPTS = [
-    "Check the current system status and tell me if there are any issues",
-    "What services are running right now?",
-    "Can you check the logs for the api-gateway service?",
-    "Run diagnostics on all services",
-    "Are there any failed services?",
-    "Inspect the health of the authentication service",
-    "Show me the system status",
-    "Check if the database service needs to be restarted",
-    "What's the health status of all services?",
-    "Investigate why the system might be slow",
-    "List all running services with their status",
-    "Check the auth-service logs",
-    "What's wrong with the api-gateway?",
-    "Diagnose any failures in the system",
-    "Show me the service health checks",
-]
-
-# Simple conversational prompts (50%) - no tool usage
-SIMPLE_PROMPTS = [
-    "Hello",
-    "What tools do you have access to?",
-    "Tell me about yourself",
-    "What can you help me with?",
-    "Explain what you do",
-    "What is this system for?",
-    "How do you diagnose failures?",
-    "What models are you using?",
-    "Thanks for your help",
-    "Can you explain your capabilities?",
-    "What's your purpose?",
-    "How does this demo work?",
-    "Tell me about the AI monitoring demo",
-    "What's the difference between the two models?",
-    "Hi there",
-]
-
-# Error-causing prompts (10%) - trigger various errors
-ERROR_PROMPTS = [
-    "",  # Empty message
-    "   ",  # Whitespace only
-    "A" * 5000,  # Very long prompt (may timeout)
-    '{"invalid": "json}',  # Malformed JSON characters
-    "Restart all containers immediately without checking anything",  # May cause agent errors
-    "Delete everything now",  # Unreasonable request
-    "\x00\x01\x02",  # Control characters
-    "🔥" * 500,  # Emoji spam
-]
+# NOTE: ModelAUser, ModelBUser, ChatModelAUser, ChatModelBUser classes removed
+# Replaced with single PassiveLoadUser that uses comprehensive prompt pool
 
 
 class PassiveLoadUser(HttpUser):
     """
-    Passive load generator for demo data generation.
+    Passive load generator for realistic AI monitoring demo data.
 
-    Sends prompts to both Model A and Model B sequentially with
-    weighted distribution: 40% tool-invoking, 50% simple, 10% error-causing.
-    Designed to create realistic AI monitoring data for New Relic demos.
+    Configuration:
+    - Runs 5-10 requests per hour (configured via constant_pacing)
+    - Uses comprehensive 18-prompt pool with weighted distribution:
+      - MCP prompts: 15% (healthy: 10%, degraded: 5%)
+      - Simple chat: 35%
+      - Complex chat: 30%
+      - Error prompts: 10%
+      - Boundary testing: 8%
+      - Abusive language: 2%
+    - Sends each prompt to both Model A and Model B for comparison
+    - Automatically generates feedback events via New Relic integration
+
+    Usage:
+    - Designed to run continuously in the background
+    - Provides realistic demo data for New Relic AI monitoring
     """
     host = AI_AGENT_URL
-    wait_time = constant_pacing(18)  # Each user sends ~3.3 request cycles/min
 
-    @task(40)
-    def send_tool_prompt_to_both_models(self):
-        """Send a tool-invoking prompt to both models."""
-        prompt = random.choice(TOOL_PROMPTS)
-        self._send_to_both_models(prompt, "Tool Prompt")
+    # 5-10 requests per hour = 1 request every 6-12 minutes
+    # Since each task sends to both models (2 requests), we pace at 12 minutes
+    # This gives ~10 requests/hour total (5 per model)
+    wait_time = constant_pacing(720)  # 12 minutes = 720 seconds
 
-    @task(50)
-    def send_simple_prompt_to_both_models(self):
-        """Send a simple prompt to both models."""
-        prompt = random.choice(SIMPLE_PROMPTS)
-        self._send_to_both_models(prompt, "Simple Prompt")
-
-    @task(10)
-    def send_error_prompt_to_both_models(self):
-        """Send an error-causing prompt to both models."""
-        prompt = random.choice(ERROR_PROMPTS)
-        self._send_to_both_models(prompt, "Error Prompt")
-
-    def _send_to_both_models(self, message: str, prompt_type: str):
+    def on_start(self):
         """
-        Send the same message to both Model A and Model B sequentially.
+        Execute immediately when user spawns (before any wait_time).
 
-        Args:
-            message: The prompt to send
-            prompt_type: Category for Locust stats grouping
+        This ensures the first request happens right away for immediate
+        feedback that load generation is working, then subsequent requests
+        follow the 720s pacing interval.
         """
+        print("[LOCUST] on_start: Sending initial request immediately...")
+        self.send_weighted_prompt_to_both_models()
+
+    @task
+    def send_weighted_prompt_to_both_models(self):
+        """
+        Send a weighted-random prompt from the comprehensive pool to both models.
+
+        Uses realistic distribution across all prompt categories for varied
+        telemetry data in New Relic.
+        """
+        try:
+            prompt_data = get_weighted_random_prompt()
+        except NameError:
+            # Fallback if prompt_pool not imported
+            prompt_data = {
+                "prompt": "Check the current system status",
+                "category": "fallback",
+                "description": "Fallback prompt"
+            }
+
+        message = prompt_data["prompt"]
+        category = prompt_data["category"]
+        description = prompt_data.get("description", "")
+        endpoint = prompt_data.get("endpoint", "/chat")
+        workflow = prompt_data.get("workflow", "N/A")
+
+        print(f"[LOCUST] Sending prompt: {category} - {description[:50]} (endpoint={endpoint})")
+
         # Send to Model A
-        with self.client.post(
-            "/chat",
-            json={"message": message, "model": "a"},
-            catch_response=True,
-            name=f"{prompt_type} (Model A)",
-            timeout=120
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Model A failed: {response.status_code}")
+        self._send_to_model(
+            message=message,
+            model="a",
+            category=category,
+            description=description,
+            prompt_data=prompt_data
+        )
 
         # Send to Model B
+        self._send_to_model(
+            message=message,
+            model="b",
+            category=category,
+            description=description,
+            prompt_data=prompt_data
+        )
+
+    def _send_to_model(self, message: str, model: str, category: str, description: str, prompt_data: dict):
+        """
+        Send a prompt to a specific model using appropriate endpoint.
+
+        Args:
+            message: The prompt text
+            model: Model identifier ("a" or "b")
+            category: Prompt category for stats grouping
+            description: Human-readable description
+            prompt_data: Full prompt dictionary with endpoint/workflow info
+        """
+        # Determine endpoint and parameters based on prompt configuration
+        endpoint = prompt_data.get('endpoint', '/chat')
+        use_workflow = prompt_data.get('use_workflow', False)
+        workflow_name = prompt_data.get('workflow', None)
+
+        if use_workflow and workflow_name and endpoint == '/repair':
+            # MCP tool prompts: Use /repair endpoint with backend workflow
+            url = f"/repair?model={model}&workflow={workflow_name}"
+            request_body = None  # /repair with workflow doesn't need body
+            print(f"[LOCUST] Sending to /repair with workflow={workflow_name}, model={model}")
+        else:
+            # Conversational prompts: Use /chat endpoint
+            url = "/chat"
+            request_body = {"message": message, "model": model}
+
         with self.client.post(
-            "/chat",
-            json={"message": message, "model": "b"},
+            url,
+            json=request_body,
             catch_response=True,
-            name=f"{prompt_type} (Model B)",
-            timeout=120
+            name=f"{category} (Model {model.upper()})",
+            timeout=120  # 2 minute timeout for complex workflows
         ) as response:
             if response.status_code == 200:
-                response.success()
+                try:
+                    result = response.json()
+                    response.success()
+                    endpoint_label = f"workflow={workflow_name}" if use_workflow else "chat"
+                    print(
+                        f"[LOCUST] ✓ Model {model.upper()}: {category} "
+                        f"({endpoint_label}, {response.elapsed.total_seconds():.1f}s)"
+                    )
+                except Exception as e:
+                    response.failure(f"Invalid JSON response: {e}")
             else:
-                response.failure(f"Model B failed: {response.status_code}")
+                response.failure(
+                    f"Model {model.upper()} failed: HTTP {response.status_code}"
+                )
+                print(f"[LOCUST] ✗ Model {model.upper()}: {category} failed")
 
 
 # ===== Usage Notes =====
 #
-# To run with all user classes (A/B split):
-#   locust -f locustfile.py --host http://ai-agent:8001
+# This locustfile is designed for passive background load generation.
 #
-# To run only Model A traffic:
-#   locust -f locustfile.py --host http://ai-agent:8001 ModelAUser
+# To run passive load for demo data generation (recommended):
+#   locust -f locustfile.py --host http://ai-agent:8001 --headless \
+#     --users 1 --spawn-rate 1 --run-time 24h
 #
-# To run only Model B traffic:
-#   locust -f locustfile.py --host http://ai-agent:8001 ModelBUser
+# Configuration:
+#   - 1 user = ~10 requests/hour (5 per model)
+#   - Comprehensive 18-prompt pool with weighted distribution
+#   - Automatic feedback event generation via New Relic
+#   - A/B model comparison (each prompt sent to both models)
 #
-# To run passive load for demo data generation:
-#   locust -f locustfile.py --host http://ai-agent:8001 PassiveLoadUser --users 10 --run-time 30m
-#
-# For A/B comparison in the UI:
-#   - Set ModelAUser and ModelBUser to equal weights
-#   - Monitor response times and success rates separately
-#   - Compare metrics in the Locust UI under "Type" column
+# The load generation automatically starts with the service and runs
+# continuously in the background to provide realistic demo data.
 #

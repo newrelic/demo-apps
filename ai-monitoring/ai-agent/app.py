@@ -1,7 +1,11 @@
 """
-AI Agent FastAPI Service - HTTP API for the autonomous repair agent.
+AI Agent FastAPI Service - LangChain Implementation
 
-Exposes endpoints for repair workflows, chat interactions, and model comparison.
+Provides:
+- /repair endpoint for autonomous tool workflows
+- /chat endpoint for conversational AI with tool access
+- /status and /metrics endpoints for monitoring
+- A/B model comparison support
 """
 
 import os
@@ -12,27 +16,24 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
 import newrelic.agent
 
-from httpx_instrumentation import apply_httpx_patch
-from agent import (
-    run_repair_workflow,
-    run_minimal_repair_workflow,
-    run_minimal_repair_workflow_manual,
-    run_chat,
-    run_debug_test,
-    run_direct_llm_test,
-    get_metrics,
-    model_a_metrics,
-    model_b_metrics
+# LangChain agent components
+from langchain_agent import (
+    init_router,
+    get_router,
+    run_agent_workflow,
+    get_all_metrics,
 )
+from prompts import REPAIR_PROMPT_TEMPLATE, CHAT_PROMPT_TEMPLATE
+from workflows import get_workflow_prompt
+from prompt_pool import list_all_prompts, get_prompt_stats
 from models import (
     RepairResult,
     ChatRequest,
     ChatResponse,
     AgentStatus,
-    ComparisonResult
+    ToolCall,
 )
 
 # Configure logging
@@ -48,74 +49,56 @@ logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
 # Track service start time
 start_time = time.time()
 
-# Token counting cache for New Relic callback
-_token_cache = {}
-
-
-def ollama_token_count_callback(model: str, content: str) -> int:
-    """
-    New Relic callback to provide token counts for LLM calls.
-
-    Since Ollama provides token counts in responses (unlike some APIs),
-    we use a cache mechanism: store tokens when we get the response,
-    then return them when NR calls this callback.
-
-    Args:
-        model: LLM model name (e.g., "mistral:7b-instruct")
-        content: Message content/prompt
-
-    Returns:
-        Token count or None if not available
-    """
-    # Create cache key from model + content hash
-    cache_key = f"{model}:{hash(content)}"
-    token_count = _token_cache.get(cache_key)
-
-    if token_count is not None:
-        logger.debug(f"[TOKEN CALLBACK] Returning {token_count} tokens for {model}")
-        return token_count
-
-    # Fallback: rough estimate based on character count
-    # OpenAI rule of thumb: ~4 chars per token
-    estimated = len(content) // 4
-    logger.debug(f"[TOKEN CALLBACK] Estimating {estimated} tokens for {model} (no cached data)")
-    return estimated
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan events."""
+    """
+    Application lifespan events.
+
+    Initializes ModelRouter with agents on startup.
+    """
     logger.info("=" * 60)
-    logger.info("🤖 AI Agent Service Starting")
+    logger.info("🤖 AI Agent Service Starting (LangChain)")
     logger.info("=" * 60)
     logger.info(f"Model A: {os.getenv('MODEL_A_NAME')} at {os.getenv('OLLAMA_MODEL_A_URL')}")
     logger.info(f"Model B: {os.getenv('MODEL_B_NAME')} at {os.getenv('OLLAMA_MODEL_B_URL')}")
     logger.info(f"MCP Server: {os.getenv('MCP_SERVER_URL')}")
     logger.info("=" * 60)
 
-    # Register New Relic token counting callback
+    # Initialize LangChain agent router
+    try:
+        init_router(REPAIR_PROMPT_TEMPLATE)
+        logger.info("✅ ModelRouter initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize ModelRouter: {e}", exc_info=True)
+        raise
+
+    # Register New Relic application (for metadata)
     try:
         application = newrelic.agent.register_application(timeout=10.0)
-        newrelic.agent.set_llm_token_count_callback(ollama_token_count_callback, application)
-        logger.info("✅ New Relic token count callback registered")
-    except Exception as e:
-        logger.warning(f"⚠️  Failed to register NR token callback: {e}")
+        logger.info("✅ New Relic application registered")
 
-    # Apply httpx monkey-patch to capture PydanticAI tokens
-    try:
-        apply_httpx_patch()
+        # Register token count callback (workaround for NR agent bug)
+        from observability import token_count_callback
+        newrelic.agent.set_llm_token_count_callback(token_count_callback, application=application)
+        logger.info("✅ New Relic LLM token count callback registered")
     except Exception as e:
-        logger.warning(f"⚠️  Failed to apply httpx patch: {e}")
+        logger.warning(f"⚠️  Failed to register NR application or token callback: {e}")
+
+    logger.info("=" * 60)
+    logger.info("Service ready to accept requests")
+    logger.info("=" * 60)
 
     yield
+
     logger.info("AI Agent Service shutting down...")
 
 
 # Create FastAPI application
 app = FastAPI(
     title="AI Agent Service",
-    description="Autonomous AI agent for system monitoring and repair with A/B model comparison",
-    version="1.0.0",
+    description="LangChain-based AI agent for system monitoring and repair with A/B model comparison",
+    version="2.0.0",  # Bumped for LangChain migration
     lifespan=lifespan
 )
 
@@ -137,101 +120,120 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "ai-agent",
+        "version": "2.0.0-langchain",
         "uptime_seconds": time.time() - start_time
     }
 
 
-# ===== Repair Workflow Endpoints =====
+# ===== Repair Workflow Endpoint =====
 
 @app.post("/repair", response_model=RepairResult)
-async def trigger_repair(model: Literal["a", "b"] = "a"):
+async def trigger_repair(
+    model: Literal["a", "b"] = "a",
+    deterministic: bool = False,
+    workflow: str = None
+):
     """
-    Trigger an autonomous repair workflow.
+    Trigger autonomous repair workflow.
 
     Args:
         model: Which model to use ("a" or "b")
+        deterministic: If True, uses predictable workflow for load testing
+        workflow: Optional workflow name (e.g., "minimal_single_tool") - overrides deterministic
 
     Returns:
         RepairResult with actions taken and outcome
     """
-    start_time = time.time()
-    logger.info(f"[REPAIR-ENDPOINT] Request received - model={model}, timestamp={start_time}")
+    start_time_req = time.time()
+    logger.info(f"[REPAIR] Request: model={model}, deterministic={deterministic}, workflow={workflow}")
 
     try:
-        if model == "a":
-            logger.info(f"[REPAIR-ENDPOINT] Executing repair with Model A")
-        elif model == "b":
-            logger.info(f"[REPAIR-ENDPOINT] Executing repair with Model B")
+        # Get prompt - workflow parameter overrides deterministic
+        if workflow:
+            prompt = get_workflow_prompt(workflow)
+            logger.info(f"[REPAIR] Using custom workflow: {workflow}")
+        elif deterministic:
+            prompt = get_workflow_prompt("repair_deterministic")
+            logger.info("[REPAIR] Using deterministic workflow")
+        else:
+            prompt = get_workflow_prompt("repair_open_ended")
+            logger.info("[REPAIR] Using open-ended workflow")
 
-        logger.info(f"[REPAIR-ENDPOINT] About to call run_repair_workflow(model={model})")
-        result = await run_repair_workflow(model)
-        logger.info(f"[REPAIR-ENDPOINT] run_repair_workflow returned")
+        # Execute agent workflow
+        result = await run_agent_workflow(model, prompt)
 
-        elapsed = time.time() - start_time
-        actions_count = len(result.get("actions_taken", [])) if isinstance(result, dict) else len(result.actions_taken)
-        logger.info(f"[REPAIR-ENDPOINT] Repair completed successfully - model={model}, elapsed={elapsed:.2f}s, actions={actions_count}")
+        # Extract tool calls from intermediate steps
+        tool_calls = []
+        actions_taken = []
 
-        return result
+        for step in result.get('intermediate_steps', []):
+            if len(step) >= 2:
+                action, observation = step[0], step[1]
+
+                # Extract tool name and arguments
+                tool_name = action.tool if hasattr(action, 'tool') else str(action)
+                tool_input = action.tool_input if hasattr(action, 'tool_input') else {}
+
+                tool_calls.append(ToolCall(
+                    tool_name=tool_name,
+                    arguments=tool_input if isinstance(tool_input, dict) else {},
+                    success=True,
+                    result=str(observation)[:200]  # Truncate for brevity
+                ))
+
+                # Build human-readable action description
+                if "health" in tool_name.lower():
+                    actions_taken.append("Checked system health")
+                elif "logs" in tool_name.lower():
+                    service = tool_input.get('service_name', 'service') if isinstance(tool_input, dict) else 'service'
+                    actions_taken.append(f"Retrieved logs from {service}")
+                elif "restart" in tool_name.lower():
+                    service = tool_input.get('service_name', 'service') if isinstance(tool_input, dict) else 'service'
+                    actions_taken.append(f"Restarted {service}")
+                elif "diagnostics" in tool_name.lower():
+                    service = tool_input.get('service_name', 'service') if isinstance(tool_input, dict) else 'service'
+                    actions_taken.append(f"Ran diagnostics on {service}")
+                elif "database" in tool_name.lower():
+                    actions_taken.append("Checked database status")
+                elif "config" in tool_name.lower():
+                    actions_taken.append("Updated service configuration")
+                else:
+                    actions_taken.append(f"Executed {tool_name}")
+
+        # Determine which services were restarted
+        containers_restarted = []
+        for tool_call in tool_calls:
+            if "restart" in tool_call.tool_name.lower():
+                service_name = tool_call.arguments.get('service_name', 'unknown')
+                containers_restarted.append(service_name)
+
+        elapsed = time.time() - start_time_req
+        logger.info(
+            f"[REPAIR] Completed: model={model}, success={result['success']}, "
+            f"latency={elapsed:.2f}s, tools={len(tool_calls)}"
+        )
+
+        return RepairResult(
+            success=result['success'],
+            actions_taken=actions_taken if actions_taken else ["No actions needed"],
+            containers_restarted=containers_restarted,
+            final_status=result['output'],
+            model_used=result['model_name'],
+            latency_seconds=result['latency_seconds'],
+            tool_calls=tool_calls,
+            ai_reasoning=None  # ReAct traces captured in tool_calls
+        )
 
     except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[REPAIR-ENDPOINT] Repair failed - model={model}, elapsed={elapsed:.2f}s, error={str(e)}", exc_info=True)
+        elapsed = time.time() - start_time_req
+        logger.error(
+            f"[REPAIR] Failed: model={model}, elapsed={elapsed:.2f}s, error={str(e)}",
+            exc_info=True
+        )
         raise HTTPException(status_code=500, detail=f"Repair workflow failed: {str(e)}")
 
 
-@app.post("/repair/minimal", response_model=RepairResult)
-async def trigger_minimal_repair(model: Literal["a", "b"] = "a"):
-    """
-    Trigger a MINIMAL repair workflow (only 2 tools for debugging).
-
-    This is a simplified version with reduced context to test if the issue is compute-related.
-
-    Args:
-        model: Which model to use ("a" or "b")
-
-    Returns:
-        RepairResult with actions taken and outcome
-    """
-    logger.info(f"[MINIMAL-REPAIR] Request received - model={model}")
-
-    try:
-        result = await run_minimal_repair_workflow(model)
-        logger.info(f"[MINIMAL-REPAIR] Completed - success={result.success}")
-        return result
-
-    except Exception as e:
-        logger.error(f"[MINIMAL-REPAIR] Failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Minimal repair failed: {str(e)}")
-
-
-@app.post("/repair/manual", response_model=RepairResult)
-async def trigger_manual_repair(model: Literal["a", "b"] = "a"):
-    """
-    Trigger a MANUAL repair workflow (bypasses PydanticAI).
-
-    This directly calls Ollama, parses tool calls from text, executes them,
-    and feeds results back. Works around Ollama's lack of function calling support.
-
-    Args:
-        model: Which model to use ("a" or "b")
-
-    Returns:
-        RepairResult with actions taken and outcome
-    """
-    logger.info(f"[MANUAL-REPAIR] Request received - model={model}")
-
-    try:
-        result = await run_minimal_repair_workflow_manual(model)
-        logger.info(f"[MANUAL-REPAIR] Completed - success={result.success}")
-        return result
-
-    except Exception as e:
-        logger.error(f"[MANUAL-REPAIR] Failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Manual repair failed: {str(e)}")
-
-
-
-# ===== Chat Endpoints =====
+# ===== Chat Endpoint =====
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -244,22 +246,68 @@ async def chat(request: ChatRequest):
     Returns:
         ChatResponse with agent's reply
     """
-    logger.info(f"Chat endpoint called with model={request.model}")
+    logger.info(f"[CHAT] Request: model={request.model}, message={request.message[:50]}...")
 
     try:
-        response_text, latency = await run_chat(request.message, request.model)
+        # Execute chat workflow
+        result = await run_agent_workflow(request.model, request.message)
 
-        model_name = os.getenv(f"MODEL_{request.model.upper()}_NAME")
+        model_name = result['model_name']
+
+        logger.info(
+            f"[CHAT] Completed: model={request.model}, "
+            f"latency={result['latency_seconds']:.2f}s"
+        )
 
         return ChatResponse(
-            response=response_text,
+            response=result['output'],
             model_used=model_name,
-            latency_seconds=latency
+            latency_seconds=result['latency_seconds']
         )
 
     except Exception as e:
-        logger.error(f"Chat failed: {e}", exc_info=True)
+        logger.error(f"[CHAT] Failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+
+# ===== Prompts Endpoint =====
+
+@app.get("/prompts")
+async def get_prompts():
+    """
+    Get list of available prompts from the prompt pool.
+
+    Returns:
+        Dictionary with prompt list and statistics
+    """
+    try:
+        prompts = list_all_prompts()
+        stats = get_prompt_stats()
+
+        # Format prompts for UI consumption
+        formatted_prompts = [
+            {
+                'id': idx,
+                'prompt': p['prompt'],
+                'category': p['category'],
+                'description': p.get('description', ''),
+                'preview': p['prompt'][:80] + ('...' if len(p['prompt']) > 80 else ''),
+                'endpoint': p.get('endpoint', '/chat'),
+                'use_workflow': p.get('use_workflow', False),
+                'workflow': p.get('workflow', None)
+            }
+            for idx, p in enumerate(prompts)
+        ]
+
+        return {
+            'success': True,
+            'prompts': formatted_prompts,
+            'total': len(formatted_prompts),
+            'stats': stats
+        }
+    except Exception as e:
+        logger.error(f"[PROMPTS] Failed to get prompts: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get prompts: {str(e)}")
 
 
 # ===== Status and Metrics Endpoints =====
@@ -272,14 +320,24 @@ async def get_status():
     Returns:
         AgentStatus with metrics for both models
     """
-    metrics_a, metrics_b = get_metrics()
+    try:
+        all_metrics = get_all_metrics()
 
-    return AgentStatus(
-        status="running",
-        model_a_metrics=metrics_a,
-        model_b_metrics=metrics_b,
-        uptime_seconds=time.time() - start_time
-    )
+        return AgentStatus(
+            status="running",
+            model_a_metrics=all_metrics['model_a'],
+            model_b_metrics=all_metrics['model_b'],
+            uptime_seconds=time.time() - start_time
+        )
+
+    except Exception as e:
+        logger.error(f"[STATUS] Failed: {e}", exc_info=True)
+        return AgentStatus(
+            status="error",
+            model_a_metrics={},
+            model_b_metrics={},
+            uptime_seconds=time.time() - start_time
+        )
 
 
 @app.get("/metrics")
@@ -288,69 +346,70 @@ async def get_metrics_endpoint():
     Get detailed metrics for both models.
 
     Returns:
-        Dictionary with metrics for Model A and Model B
+        Dictionary with metrics for Model A and Model B, plus cache stats
     """
-    metrics_a, metrics_b = get_metrics()
+    try:
+        from cache import get_cache_stats
 
-    return {
-        "model_a": {
-            "name": metrics_a.model_name,
-            "total_requests": metrics_a.total_requests,
-            "successful_requests": metrics_a.successful_requests,
-            "failed_requests": metrics_a.failed_requests,
-            "success_rate": (
-                metrics_a.successful_requests / metrics_a.total_requests
-                if metrics_a.total_requests > 0 else 0
-            ),
-            "avg_latency_seconds": metrics_a.avg_latency_seconds
-        },
-        "model_b": {
-            "name": metrics_b.model_name,
-            "total_requests": metrics_b.total_requests,
-            "successful_requests": metrics_b.successful_requests,
-            "failed_requests": metrics_b.failed_requests,
-            "success_rate": (
-                metrics_b.successful_requests / metrics_b.total_requests
-                if metrics_b.total_requests > 0 else 0
-            ),
-            "avg_latency_seconds": metrics_b.avg_latency_seconds
+        metrics = get_all_metrics()
+        metrics['cache_stats'] = get_cache_stats()
+        return metrics
+    except Exception as e:
+        logger.error(f"[METRICS] Failed: {e}", exc_info=True)
+        return {
+            "error": str(e),
+            "model_a": {},
+            "model_b": {},
+            "cache_stats": {}
         }
-    }
 
 
 # ===== Debug Endpoints =====
 
-@app.post("/debug/test")
-async def debug_test(message: str = "Hello, can you respond?", model: Literal["a", "b"] = "a"):
-    """
-    Test minimal agent with NO TOOLS to diagnose PydanticAI hanging.
-
-    Args:
-        message: Test message
-        model: Which model to use ("a" or "b")
-
-    Returns:
-        Test result dictionary
-    """
-    logger.info(f"Debug test endpoint called - model={model}")
-    result = await run_debug_test(message, model)
-    return result
-
-
 @app.post("/debug/direct-llm")
-async def debug_direct_llm(model: Literal["a", "b"] = "a"):
+async def debug_direct_llm(model: Literal["a", "b"] = "a", message: str = "Hello"):
     """
-    Bypass PydanticAI and call Ollama directly to diagnose issues.
+    Direct LLM call without agent orchestration (for debugging).
 
     Args:
         model: Which model to use ("a" or "b")
+        message: Test message
 
     Returns:
-        Test result dictionary
+        Raw LLM response with timing
     """
-    logger.info(f"Direct LLM test endpoint called - model={model}")
-    result = await run_direct_llm_test(model)
-    return result
+    logger.info(f"[DEBUG-LLM] Direct call: model={model}, message={message[:50]}...")
+
+    try:
+        router = get_router()
+        llm = router.model_a if model == "a" else router.model_b
+        model_name = router.get_model_name(model)
+
+        start_time_llm = time.time()
+
+        # Direct LLM invocation (no tools, no agent)
+        from langchain.schema import HumanMessage
+        response = await llm.ainvoke([HumanMessage(content=message)])
+
+        latency = time.time() - start_time_llm
+
+        logger.info(f"[DEBUG-LLM] Success: latency={latency:.2f}s")
+
+        return {
+            "success": True,
+            "model": model_name,
+            "model_variant": model,
+            "response": response.content,
+            "latency_seconds": latency,
+        }
+
+    except Exception as e:
+        logger.error(f"[DEBUG-LLM] Failed: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "model": model,
+        }
 
 
 # ===== Root Endpoint =====
@@ -360,18 +419,21 @@ async def root():
     """Root endpoint with service information."""
     return {
         "service": "ai-agent",
-        "version": "1.0.0",
-        "description": "Autonomous AI agent for system monitoring and repair",
+        "version": "2.0.0-langchain",
+        "description": "LangChain-based AI agent for system monitoring and repair",
+        "framework": "langchain",
         "models": {
             "a": os.getenv("MODEL_A_NAME", "mistral:7b-instruct"),
             "b": os.getenv("MODEL_B_NAME", "ministral-3:8b-instruct-2512-q8_0")
         },
         "endpoints": {
-            "repair": "POST /repair?model={a|b}",
-            "chat": "POST /chat",
+            "repair": "POST /repair?model={a|b}&workflow={workflow_name}",
+            "chat": "POST /chat (body: {message, model})",
+            "prompts": "GET /prompts",
             "status": "GET /status",
             "metrics": "GET /metrics",
-            "health": "GET /health"
+            "health": "GET /health",
+            "debug": "POST /debug/direct-llm?model={a|b}&message=..."
         }
     }
 

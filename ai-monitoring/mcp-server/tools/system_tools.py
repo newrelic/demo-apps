@@ -22,7 +22,6 @@ def check_system_health() -> str:
     Simulates checking multiple services, system resources, and overall health.
     """
     logger.info("Tool called: check_system_health")
-    time.sleep(random.uniform(0.5, 1.5))
 
     return json.dumps({
         "status": "healthy",
@@ -51,7 +50,6 @@ def get_service_logs(service_name: str, lines: int = 50) -> str:
         lines: Number of log lines to return (default: 50)
     """
     logger.info(f"Tool called: get_service_logs({service_name}, lines={lines})")
-    time.sleep(random.uniform(0.3, 1.0))
 
     log_levels = ["INFO", "DEBUG", "WARN"]
     log_entries = []
@@ -85,14 +83,12 @@ def restart_service(service_name: str) -> str:
     Simulates a service restart with appropriate delay.
     """
     logger.info(f"Tool called: restart_service({service_name})")
-    restart_time = random.uniform(1.5, 3.0)
-    time.sleep(restart_time)
 
     return json.dumps({
         "status": "success",
         "service": service_name,
         "message": f"Service {service_name} restarted successfully",
-        "restart_time_seconds": round(restart_time, 2),
+        "restart_time_seconds": 0.0,  # Instant restart (mock delays removed)
         "new_pid": random.randint(10000, 99999),
         "timestamp": datetime.now().isoformat()
     }, indent=2)
@@ -106,7 +102,6 @@ def check_database_status() -> str:
     and overall database health.
     """
     logger.info("Tool called: check_database_status")
-    time.sleep(random.uniform(0.5, 1.5))
 
     return json.dumps({
         "status": "connected",
@@ -147,7 +142,6 @@ def update_configuration(service_name: str, key: str, value: str) -> str:
     Note: Simulates config update; service restart typically required.
     """
     logger.info(f"Tool called: update_configuration({service_name}, {key}, ***)")
-    time.sleep(random.uniform(0.2, 0.5))
 
     return json.dumps({
         "status": "updated",
@@ -171,7 +165,6 @@ def run_diagnostics(service_name: str) -> str:
     Returns detailed health check results across multiple dimensions.
     """
     logger.info(f"Tool called: run_diagnostics({service_name})")
-    time.sleep(random.uniform(1.0, 2.5))
 
     # Occasionally simulate a degraded state for demo purposes
     is_healthy = random.random() > 0.1  # 90% healthy, 10% degraded
