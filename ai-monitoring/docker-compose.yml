@@ -17,7 +17,6 @@ services:
       - OLLAMA_MAX_LOADED_MODELS=1     # Only keep 1 model in memory
       - OLLAMA_NUM_THREAD=12           # Use all 12 CPU threads (test one model at a time)
       - OLLAMA_CONTEXT_LENGTH=8192     # Context window size (default 4096 was too small)
-      #- NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 60s
@@ -51,7 +50,6 @@ services:
       - OLLAMA_MAX_LOADED_MODELS=1     # Only keep 1 model in memory
       - OLLAMA_NUM_THREAD=12           # Use all 12 CPU threads (test one model at a time)
       - OLLAMA_CONTEXT_LENGTH=8192     # Context window size (default 4096 was too small)
-      #- NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 60s

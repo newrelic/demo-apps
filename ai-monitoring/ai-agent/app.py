@@ -78,7 +78,7 @@ async def lifespan(app: FastAPI):
         application = newrelic.agent.register_application(timeout=10.0)
         logger.info("✅ New Relic application registered")
 
-        # Register token count callback (workaround for NR agent bug)
+        # Register token count callback (for providers without token counts in responses)
         from observability import token_count_callback
         newrelic.agent.set_llm_token_count_callback(token_count_callback, application=application)
         logger.info("✅ New Relic LLM token count callback registered")

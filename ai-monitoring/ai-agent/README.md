@@ -10,7 +10,7 @@ Autonomous reasoning engine powered by **LangChain** that executes multi-step sy
 - **Backend Workflow Control**: Deterministic tool invocations via workflow parameters
 - **MCP Tool Calling**: Integrates with MCP server for generic system operation tools
 - **LLM Feedback Events**: Automatic binary rating generation with smart heuristics
-- **Token Counting**: Custom callback for New Relic token tracking
+- **Token Counting**: tiktoken-based client-side token counting for accurate metrics
 - **Metrics Collection**: Tracks performance metrics for model comparison
 - **Chat Interface**: Interactive chat with system prompts and tool integration
 - **New Relic Instrumentation**: Full APM monitoring with distributed tracing
@@ -21,7 +21,8 @@ Autonomous reasoning engine powered by **LangChain** that executes multi-step sy
 
 - **Framework**: FastAPI 0.128.0 + uvicorn 0.40.0
 - **AI Engine**: LangChain 0.3.11 (LLM agent framework)
-- **Ollama Integration**: langchain-ollama 0.2.1
+- **Ollama Integration**: langchain-openai 0.2.14 (using OpenAI-compatible API)
+- **Token Counting**: tiktoken 0.8.0 (client-side token counting)
 - **Community Tools**: langchain-community 0.3.12
 - **HTTP Client**: httpx 0.28.1 (async)
 - **Data Validation**: Pydantic 2.12.5
@@ -223,12 +224,21 @@ record_feedback_event(
 
 ### Token Count Callback
 
-Custom callback registered for accurate token tracking:
+Custom tiktoken-based callback registered for accurate token tracking:
 
 ```python
 # In app.py:76-85
 application = newrelic.agent.register_application(timeout=10.0)
 newrelic.agent.set_llm_token_count_callback(token_count_callback, application=application)
+
+# In observability.py:46-103
+def token_count_callback(model: str, content: Any) -> int:
+    """
+    New Relic calls this with message content (strings) to count tokens.
+    We use tiktoken with cl100k_base encoding for accurate token counts.
+    """
+    encoder = _get_tiktoken_encoder(model)
+    return len(encoder.encode(content))
 ```
 
 ## Dependencies
@@ -352,32 +362,12 @@ docker logs aim-mcp-server
 
 # Restart MCP server
 docker-compose restart mcp-server
-```
-
-## Migration from PydanticAI
-
-This service was migrated from PydanticAI to LangChain for enhanced observability and native tool integration.
-
-**Files Removed**:
-- `agent.py` → Replaced by `langchain_agent.py`
-- `httpx_instrumentation.py` → No longer needed with New Relic native support
-
-**Files Added**:
-- `langchain_agent.py`: LangChain ReAct agent implementation
-- `mcp_tools.py`: MCP tool integration for LangChain
-- `observability.py`: New Relic feedback events & token counting
-- `workflows.py`: Backend workflow definitions
-- `prompt_pool.py`: 18-prompt testing pool
-- `cache.py`: Response caching utilities
-
-## License
-
-Built for New Relic AI Monitoring Demo
 
 ## Tech Stack
 
 - LangChain 0.3.11
-- langchain-ollama 0.2.1
+- langchain-openai 0.2.14 (using Ollama's OpenAI-compatible API)
+- tiktoken 0.8.0 (token counting)
 - langchain-community 0.3.12
 - FastAPI 0.128.0
 - httpx 0.28.1

@@ -122,7 +122,7 @@ class ModelRouter:
 
         # CRITICAL FIX: Bind callbacks to LLM so it triggers on_llm_start/on_llm_end
         # Without this, only AgentExecutor events fire (on_agent_finish, on_tool_*),
-        # but NOT LLM events, which means record_llm_chat_completion_summary() never gets called
+        # but NOT LLM events, which prevents custom attributes from being added to LLM events
         llm_with_callbacks = llm.with_config(callbacks=[nr_callback])
 
         # Create ReAct agent with callback-enabled LLM
@@ -271,8 +271,9 @@ async def run_agent_workflow(
         success = True
         latency = time.time() - start_time
 
-        # Extract token count if available
-        total_tokens = 0  # TODO: Extract from callbacks if needed
+        # Token counts tracked by New Relic via token_count_callback
+        # TODO: Optionally extract from NewRelicCallback for local metrics aggregation
+        total_tokens = 0
 
         # Count tool calls for feedback heuristic
         tool_count = len(result.get('intermediate_steps', []))

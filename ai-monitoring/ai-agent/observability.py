@@ -67,8 +67,8 @@ def token_count_callback(model: str, content: Any) -> int:
             encoder = _get_tiktoken_encoder(model)
             token_count = len(encoder.encode(content))
 
-            # Log every token count for verification
-            logger.info(
+            # Debug logging only
+            logger.debug(
                 f"[NR-TOKEN-CALLBACK] Counted {token_count} tokens "
                 f"for {len(content)} chars (model={model})"
             )
@@ -245,9 +245,9 @@ class NewRelicCallback(BaseCallbackHandler):
     LangChain callback handler for New Relic instrumentation.
 
     Records:
-    - LLM token usage (manual workaround for NR agent bug)
     - Custom attributes for model comparison
     - Agent execution metrics
+    - LLM-level event tracking (on_llm_start, on_llm_end)
     """
 
     def __init__(self, model_name: str, model_variant: str):
@@ -284,69 +284,35 @@ class NewRelicCallback(BaseCallbackHandler):
         """
         Called when LLM finishes generating.
 
-        Extracts token counts and records to New Relic.
+        Extracts token counts from the LangChain response and records custom attributes.
+        Note: Token counts in New Relic events come from tiktoken via token_count_callback.
         """
-        logger.info(f"[NR-CALLBACK] on_llm_end called - model={self.model_name}")
+        logger.debug(f"[NR-CALLBACK] on_llm_end called - model={self.model_name}")
         latency_ms = (time.time() - self.llm_start_time) * 1000 if self.llm_start_time else 0
 
-        # Extract token usage from LLM response
-        # Try multiple paths as different LLM providers structure responses differently
+        # Extract token usage from LLM response for custom attributes
+        # Note: Ollama's OpenAI-compatible endpoint doesn't include usage data,
+        # but we attempt extraction anyway in case the provider changes
         prompt_tokens = 0
         completion_tokens = 0
         total_tokens = 0
 
-        # Debug: Log response structure
-        logger.info(f"[NR-TOKEN] Response structure - has generations: {bool(response.generations)}, has llm_output: {bool(response.llm_output)}")
-        if response.llm_output:
-            logger.info(f"[NR-TOKEN] llm_output keys: {list(response.llm_output.keys())}")
-
-        # Check for response_metadata (ChatOpenAI might store tokens here)
-        if hasattr(response, 'response_metadata'):
-            logger.info(f"[NR-TOKEN] response_metadata: {response.response_metadata}")
-
-        # Check generation object for additional metadata
-        if response.generations and response.generations[0]:
-            gen = response.generations[0][0]
-            if hasattr(gen, 'message') and hasattr(gen.message, 'response_metadata'):
-                logger.info(f"[NR-TOKEN] message.response_metadata: {gen.message.response_metadata}")
-
-        # Primary path: generation_info (ChatOllama, langchain-ollama)
-        # Ollama returns tokens in generation_info with keys: prompt_eval_count, eval_count
+        # Try generation_info first (Ollama native format)
         if response.generations and response.generations[0]:
             try:
                 gen_info = response.generations[0][0].generation_info or {}
-                logger.info(f"[NR-TOKEN] generation_info keys: {list(gen_info.keys())}")
-
                 prompt_tokens = gen_info.get('prompt_eval_count', 0)
                 completion_tokens = gen_info.get('eval_count', 0)
                 total_tokens = prompt_tokens + completion_tokens
+            except (IndexError, AttributeError, TypeError):
+                pass
 
-                # Debug logging to verify we're extracting correctly
-                if total_tokens > 0:
-                    logger.info(
-                        f"[NR-TOKEN] Extracted from generation_info: "
-                        f"prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}"
-                    )
-            except (IndexError, AttributeError, TypeError) as e:
-                logger.info(f"[NR-TOKEN] Could not extract from generation_info: {e}")
-
-        # Fallback path: llm_output.token_usage (OpenAI-style, other providers)
-        if total_tokens == 0:
-            llm_output = response.llm_output or {}
-            token_usage = llm_output.get('token_usage', {})
-            logger.info(f"[NR-TOKEN] token_usage from llm_output: {token_usage}")
-
+        # Fallback: llm_output.token_usage (OpenAI-style)
+        if total_tokens == 0 and response.llm_output:
+            token_usage = response.llm_output.get('token_usage', {})
             prompt_tokens = token_usage.get('prompt_tokens', 0)
             completion_tokens = token_usage.get('completion_tokens', 0)
             total_tokens = token_usage.get('total_tokens', prompt_tokens + completion_tokens)
-
-            if total_tokens > 0:
-                logger.info(
-                    f"[NR-TOKEN] Extracted from llm_output: "
-                    f"prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}"
-                )
-            else:
-                logger.info(f"[NR-TOKEN] No tokens found in llm_output")
 
         # Log LLM completion for monitoring
         logger.info(
@@ -356,7 +322,7 @@ class NewRelicCallback(BaseCallbackHandler):
         )
 
         # Note: New Relic automatically creates LlmChatCompletionMessage events
-        # from the httpx HTTP calls that ChatOllama makes internally.
+        # from the httpx HTTP calls that ChatOpenAI makes to Ollama's OpenAI-compatible API.
         # We don't need to manually record them - the automatic instrumentation
         # handles event creation. We just enrich them with custom attributes below.
 

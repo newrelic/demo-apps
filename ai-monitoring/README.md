@@ -14,31 +14,6 @@ This demo showcases:
 - **Hallucination Detection**: Chat interface for testing boundary behaviors
 - **Passive Load Generation**: Automatic background traffic for continuous demo data
 
-## 📢 Recent Updates
-
-### ✨ Passive Load Generation & Enhanced Observability (January 2026)
-
-The demo has been significantly enhanced with comprehensive passive load generation and improved New Relic observability:
-
-**🔧 Key Architecture Change**: MCP tool invocations now use **backend workflow control** via `/repair` endpoint with workflow parameters, ensuring deterministic tool usage and consistent telemetry (not LLM-decided).
-
-**New Features**:
-- **LLM Feedback Events**: Automatic binary (thumbs-up/down) feedback generation based on response heuristics (latency, tool usage, success rate)
-- **18-Prompt Test Pool**: Comprehensive prompts covering MCP tools (backend-controlled), simple/complex chat, errors, boundary testing, and abusive language
-- **Enhanced /chat UI**: Dropdown selection of all 18 prompts with preview, plus random selection
-- **Passive Load Auto-Start**: Generates 5-10 requests/hour automatically, starts immediately on launch
-- **Token Count Callback**: Custom instrumentation workaround for NR Python agent token capture bug
-
-**Observability Improvements**:
-- `newrelic.agent.current_trace_id()` for proper feedback event correlation
-- `newrelic.agent.record_llm_feedback_event()` with smart rating heuristics
-- `newrelic.agent.set_llm_token_count_callback()` for token tracking
-- Backend workflow endpoints force specific tool invocations (deterministic telemetry)
-
-**Load Distribution**: MCP 15% (backend-controlled), Simple Chat 35%, Complex Chat 30%, Error 10%, Boundary 8%, Abusive 2%
-
-For complete details on these updates, see implementation notes at the end of this document.
-
 ## 🏗️ Architecture
 
 The system consists of 6 Docker services:
@@ -777,7 +752,7 @@ All three Python services are instrumented with **New Relic Python Agent 11.2.0+
 - **mcp-server** (aim-demo_mcp-server)
 - **flask-ui** (aim-demo_flask-ui)
 
-**Configuration Method**: `.ini` files with ConfigParser variable substitution (`%(VAR)s`)
+**Configuration Method**: `.ini` files with environment variables for `NEW_RELIC_LICENSE_KEY` and `NEW_RELIC_APP_NAME`
 
 **Features Enabled**:
 - ✅ **Distributed Tracing** (W3C trace context propagation across all services)
@@ -885,7 +860,6 @@ For detailed cleanup and disk space management strategies, see the [Cleanup & Di
 ## 🎓 Learning Resources
 
 ### Related Documentation
-- [PydanticAI Documentation](https://ai.pydantic.dev)
 - [Ollama Documentation](https://ollama.ai/docs)
 - [FastMCP Documentation](https://github.com/jlowin/fastmcp)
 - [Flask Documentation](https://flask.palletsprojects.com/en/stable/)
@@ -910,50 +884,9 @@ For detailed cleanup and disk space management strategies, see the [Cleanup & Di
 - **Customize agent behavior**: [ai-agent/README.md](ai-agent/README.md)
 - **MCP tool operations**: [mcp-server/README.md](mcp-server/README.md)
 - **Load generation configuration**: [locust-tests/README.md](locust-tests/README.md)
-
-## 🤝 Contributing
-
-This is a demonstration application. For production use:
-- Add authentication and authorization
-- Implement rate limiting
-- Use secrets management
-- Add comprehensive error handling
-- Implement proper logging and monitoring
-- Use production-grade models
-
-## 📝 License
-
-This demo application is provided as-is for demonstration purposes.
-
-## 🙋 Support
-
-For issues or questions:
-1. Check troubleshooting section above
-2. Review Docker logs
-3. Verify system requirements
-4. Check GitHub issues
-
 ---
 
 ## 📝 Implementation Details: Passive Load & Observability Updates
-
-### New Files Added
-
-| File | Purpose |
-|------|---------|
-| `ai-agent/observability.py` | New Relic LLM feedback events, token counting, rating heuristics |
-| `ai-agent/langchain_agent.py` | LangChain-based agent (replaces PydanticAI agent.py) |
-| `ai-agent/mcp_tools.py` | MCP tool integration for LangChain |
-| `ai-agent/workflows.py` | Backend-controlled workflow definitions |
-| `ai-agent/prompt_pool.py` | 18-prompt comprehensive testing pool |
-| `ai-agent/cache.py` | Caching utilities for agent responses |
-
-### Files Removed
-
-| File | Reason |
-|------|--------|
-| `ai-agent/agent.py` | Replaced with LangChain implementation (langchain_agent.py) |
-| `ai-agent/httpx_instrumentation.py` | No longer needed with New Relic native support |
 
 ### Key Architecture: Backend Workflow Control
 
@@ -1054,19 +987,14 @@ Result: ~10 requests/hour (5 per model) with immediate startup feedback.
 
 ### Technology Stack Update
 
-**Before (PydanticAI)**:
-- PydanticAI 1.39.1
-- Custom MCP client implementation
-- Manual tool invocation
-
-**After (LangChain)**:
 - LangChain 0.3.11
-- langchain-ollama 0.2.1
+- langchain-openai 0.2.14 (using Ollama's OpenAI-compatible API)
 - langchain-community 0.3.12
+- tiktoken 0.8.0 (for client-side token counting)
 - Native MCP integration
 - Built-in observability hooks
-- LLM feedback events
-- Token count callbacks
+- LLM feedback events with smart heuristics
+- tiktoken-based token counting callback for accurate token metrics
 
 ---
 
