@@ -15,39 +15,91 @@ from typing import Any, Dict, List, Optional
 import newrelic.agent
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.schema import LLMResult
+import tiktoken
 
 logger = logging.getLogger(__name__)
 
+# Cache tiktoken encoders
+_TIKTOKEN_ENCODERS = {}
 
-def token_count_callback(model: str, content: Dict[str, Any]) -> int:
+
+def _get_tiktoken_encoder(model: str):
+    """
+    Get or create cached tiktoken encoder for the given model.
+
+    Args:
+        model: Model name (e.g., "mistral:7b-instruct")
+
+    Returns:
+        tiktoken encoder
+    """
+    # Use cl100k_base encoding for most models (GPT-4, GPT-3.5-turbo baseline)
+    # This is a reasonable approximation for Ollama models too
+    encoding_name = "cl100k_base"
+
+    if encoding_name not in _TIKTOKEN_ENCODERS:
+        _TIKTOKEN_ENCODERS[encoding_name] = tiktoken.get_encoding(encoding_name)
+
+    return _TIKTOKEN_ENCODERS[encoding_name]
+
+
+def token_count_callback(model: str, content: Any) -> int:
     """
     Callback for New Relic LLM token counting.
 
-    Workaround for NR agent bug preventing automatic token capture.
+    New Relic calls this function with message content (strings) to count tokens.
+    We use tiktoken to count tokens from the text content.
 
     Args:
-        model: Model name
-        content: Message content dict with token usage
+        model: Model name from the request
+        content: Message content (string) or response dict
 
     Returns:
-        Token count extracted from content
+        Token count
     """
-    # LangChain typically provides token usage in different formats
-    # Try to extract from various possible locations
-    if isinstance(content, dict):
-        # Check for direct token usage
-        if 'token_usage' in content:
-            usage = content['token_usage']
-            if isinstance(usage, dict):
-                return usage.get('total_tokens', 0)
+    try:
+        # Handle string content (most common case from New Relic)
+        if isinstance(content, str):
+            if not content or len(content) == 0:
+                return 0
 
-        # Check for usage_metadata (OpenAI format)
-        if 'usage_metadata' in content:
-            metadata = content['usage_metadata']
-            if isinstance(metadata, dict):
-                return metadata.get('total_tokens', 0)
+            # Count tokens using tiktoken
+            encoder = _get_tiktoken_encoder(model)
+            token_count = len(encoder.encode(content))
 
-    return 0
+            # Log every token count for verification
+            logger.info(
+                f"[NR-TOKEN-CALLBACK] Counted {token_count} tokens "
+                f"for {len(content)} chars (model={model})"
+            )
+
+            return token_count
+
+        # Handle dict content (legacy/fallback for explicit token counts)
+        if isinstance(content, dict):
+            # OpenAI format: usage.total_tokens
+            if 'usage' in content:
+                usage = content['usage']
+                if isinstance(usage, dict):
+                    total = usage.get('total_tokens', 0)
+                    if total > 0:
+                        logger.info(f"[NR-TOKEN-CALLBACK] Extracted from usage: {total}")
+                        return total
+
+            # Ollama format: prompt_eval_count + eval_count
+            if 'prompt_eval_count' in content or 'eval_count' in content:
+                prompt_tokens = content.get('prompt_eval_count', 0)
+                completion_tokens = content.get('eval_count', 0)
+                total = prompt_tokens + completion_tokens
+                if total > 0:
+                    logger.info(f"[NR-TOKEN-CALLBACK] Extracted from Ollama format: {total}")
+                    return total
+
+        return 0
+
+    except Exception as e:
+        logger.warning(f"[NR-TOKEN-CALLBACK] Error counting tokens: {e}")
+        return 0
 
 
 def record_feedback_event(
@@ -234,33 +286,79 @@ class NewRelicCallback(BaseCallbackHandler):
 
         Extracts token counts and records to New Relic.
         """
+        logger.info(f"[NR-CALLBACK] on_llm_end called - model={self.model_name}")
         latency_ms = (time.time() - self.llm_start_time) * 1000 if self.llm_start_time else 0
 
         # Extract token usage from LLM response
-        llm_output = response.llm_output or {}
-        token_usage = llm_output.get('token_usage', {})
+        # Try multiple paths as different LLM providers structure responses differently
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
 
-        prompt_tokens = token_usage.get('prompt_tokens', 0)
-        completion_tokens = token_usage.get('completion_tokens', 0)
-        total_tokens = token_usage.get('total_tokens', 0)
+        # Debug: Log response structure
+        logger.info(f"[NR-TOKEN] Response structure - has generations: {bool(response.generations)}, has llm_output: {bool(response.llm_output)}")
+        if response.llm_output:
+            logger.info(f"[NR-TOKEN] llm_output keys: {list(response.llm_output.keys())}")
 
-        # TEMPORARY WORKAROUND: Manual token recording due to NR agent bug
-        # TODO: Remove once New Relic fixes automatic token capture
-        try:
-            newrelic.agent.record_llm_chat_completion_summary(
-                model=self.model_name,
-                input_tokens=prompt_tokens,
-                output_tokens=completion_tokens,
-                llm_vendor='ollama',
-                response_time_ms=latency_ms,
-            )
-            logger.info(
-                f"[NR-LLM] Recorded completion: model={self.model_name}, "
-                f"tokens={total_tokens} ({prompt_tokens}p + {completion_tokens}c), "
-                f"latency={latency_ms:.0f}ms"
-            )
-        except Exception as e:
-            logger.warning(f"[NR-LLM] Failed to record completion: {e}")
+        # Check for response_metadata (ChatOpenAI might store tokens here)
+        if hasattr(response, 'response_metadata'):
+            logger.info(f"[NR-TOKEN] response_metadata: {response.response_metadata}")
+
+        # Check generation object for additional metadata
+        if response.generations and response.generations[0]:
+            gen = response.generations[0][0]
+            if hasattr(gen, 'message') and hasattr(gen.message, 'response_metadata'):
+                logger.info(f"[NR-TOKEN] message.response_metadata: {gen.message.response_metadata}")
+
+        # Primary path: generation_info (ChatOllama, langchain-ollama)
+        # Ollama returns tokens in generation_info with keys: prompt_eval_count, eval_count
+        if response.generations and response.generations[0]:
+            try:
+                gen_info = response.generations[0][0].generation_info or {}
+                logger.info(f"[NR-TOKEN] generation_info keys: {list(gen_info.keys())}")
+
+                prompt_tokens = gen_info.get('prompt_eval_count', 0)
+                completion_tokens = gen_info.get('eval_count', 0)
+                total_tokens = prompt_tokens + completion_tokens
+
+                # Debug logging to verify we're extracting correctly
+                if total_tokens > 0:
+                    logger.info(
+                        f"[NR-TOKEN] Extracted from generation_info: "
+                        f"prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}"
+                    )
+            except (IndexError, AttributeError, TypeError) as e:
+                logger.info(f"[NR-TOKEN] Could not extract from generation_info: {e}")
+
+        # Fallback path: llm_output.token_usage (OpenAI-style, other providers)
+        if total_tokens == 0:
+            llm_output = response.llm_output or {}
+            token_usage = llm_output.get('token_usage', {})
+            logger.info(f"[NR-TOKEN] token_usage from llm_output: {token_usage}")
+
+            prompt_tokens = token_usage.get('prompt_tokens', 0)
+            completion_tokens = token_usage.get('completion_tokens', 0)
+            total_tokens = token_usage.get('total_tokens', prompt_tokens + completion_tokens)
+
+            if total_tokens > 0:
+                logger.info(
+                    f"[NR-TOKEN] Extracted from llm_output: "
+                    f"prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}"
+                )
+            else:
+                logger.info(f"[NR-TOKEN] No tokens found in llm_output")
+
+        # Log LLM completion for monitoring
+        logger.info(
+            f"[NR-LLM] LLM completion: model={self.model_name}, "
+            f"tokens={total_tokens} ({prompt_tokens}p + {completion_tokens}c), "
+            f"latency={latency_ms:.0f}ms"
+        )
+
+        # Note: New Relic automatically creates LlmChatCompletionMessage events
+        # from the httpx HTTP calls that ChatOllama makes internally.
+        # We don't need to manually record them - the automatic instrumentation
+        # handles event creation. We just enrich them with custom attributes below.
 
         # Add token counts as custom attributes for analysis
         txn = newrelic.agent.current_transaction()

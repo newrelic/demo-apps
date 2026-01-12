@@ -1,9 +1,11 @@
 # LangChain stack for AI agent with native New Relic support
 langchain~=0.3.11
 langchain-ollama~=0.2.1
+langchain-openai~=0.2.14
 langchain-community~=0.3.12
 fastapi~=0.128.0
 uvicorn[standard]~=0.40.0
 httpx~=0.28.1
 pydantic~=2.12.5
 newrelic~=11.2.0
+tiktoken~=0.8.0

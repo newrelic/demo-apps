@@ -10,7 +10,7 @@ Provides:
 import os
 import logging
 from typing import Literal, Dict, Any, List
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from langchain.agents import create_react_agent, AgentExecutor
 from langchain.prompts import PromptTemplate
 
@@ -20,9 +20,10 @@ from observability import NewRelicCallback, MetricsTracker
 logger = logging.getLogger(__name__)
 
 # Model configurations
-# Note: ChatOllama uses native Ollama API, so strip /v1 suffix if present
-OLLAMA_MODEL_A_URL = os.getenv("OLLAMA_MODEL_A_URL", "http://ollama-model-a:11434").rstrip("/v1")
-OLLAMA_MODEL_B_URL = os.getenv("OLLAMA_MODEL_B_URL", "http://ollama-model-b:11434").rstrip("/v1")
+# Use OpenAI-compatible endpoints (/v1/chat/completions) for New Relic instrumentation
+# This allows New Relic to automatically create LlmChatCompletionMessage events
+OLLAMA_MODEL_A_URL = os.getenv("OLLAMA_MODEL_A_URL", "http://ollama-model-a:11434/v1")
+OLLAMA_MODEL_B_URL = os.getenv("OLLAMA_MODEL_B_URL", "http://ollama-model-b:11434/v1")
 MODEL_A_NAME = os.getenv("MODEL_A_NAME", "mistral:7b-instruct")
 MODEL_B_NAME = os.getenv("MODEL_B_NAME", "ministral-3:8b-instruct-2512-q8_0")
 
@@ -50,21 +51,28 @@ class ModelRouter:
         self.metrics_a = MetricsTracker(MODEL_A_NAME)
         self.metrics_b = MetricsTracker(MODEL_B_NAME)
 
-        # Create LLM instances
+        # Create LLM instances using OpenAI-compatible API
+        # This enables New Relic automatic instrumentation for LlmChatCompletionMessage events
         logger.info(f"Model A: {MODEL_A_NAME} at {OLLAMA_MODEL_A_URL}")
-        self.model_a = ChatOllama(
+        self.model_a = ChatOpenAI(
             model=MODEL_A_NAME,
             base_url=OLLAMA_MODEL_A_URL,
+            api_key="ollama",  # Ollama doesn't require real API key, but ChatOpenAI needs one
             temperature=0.1,  # Low temperature for deterministic tool calls
-            num_predict=2048,  # Max output tokens
+            max_tokens=2048,  # Max output tokens
+            # Note: keep_alive is not supported via OpenAI-compatible API
+            # Models will auto-unload after default timeout (5 minutes)
         )
 
         logger.info(f"Model B: {MODEL_B_NAME} at {OLLAMA_MODEL_B_URL}")
-        self.model_b = ChatOllama(
+        self.model_b = ChatOpenAI(
             model=MODEL_B_NAME,
             base_url=OLLAMA_MODEL_B_URL,
+            api_key="ollama",  # Ollama doesn't require real API key, but ChatOpenAI needs one
             temperature=0.1,
-            num_predict=2048,
+            max_tokens=2048,
+            # Note: keep_alive is not supported via OpenAI-compatible API
+            # Models will auto-unload after default timeout (5 minutes)
         )
 
         # Create MCP tools (shared between agents)
@@ -92,7 +100,7 @@ class ModelRouter:
 
     def _create_agent(
         self,
-        llm: ChatOllama,
+        llm: ChatOpenAI,
         model_name: str,
         model_variant: str,
         prompt_template: PromptTemplate
@@ -101,7 +109,7 @@ class ModelRouter:
         Create a ReAct agent executor.
 
         Args:
-            llm: ChatOllama instance
+            llm: ChatOpenAI instance (pointed at Ollama)
             model_name: Full model name
             model_variant: Model identifier ("a" or "b")
             prompt_template: System prompt template
@@ -112,9 +120,14 @@ class ModelRouter:
         # Create New Relic callback for this model
         nr_callback = NewRelicCallback(model_name, model_variant)
 
-        # Create ReAct agent
+        # CRITICAL FIX: Bind callbacks to LLM so it triggers on_llm_start/on_llm_end
+        # Without this, only AgentExecutor events fire (on_agent_finish, on_tool_*),
+        # but NOT LLM events, which means record_llm_chat_completion_summary() never gets called
+        llm_with_callbacks = llm.with_config(callbacks=[nr_callback])
+
+        # Create ReAct agent with callback-enabled LLM
         agent = create_react_agent(
-            llm=llm,
+            llm=llm_with_callbacks,
             tools=self.tools,
             prompt=prompt_template,
         )
