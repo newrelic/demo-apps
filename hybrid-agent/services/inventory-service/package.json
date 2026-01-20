@@ -1,0 +1,35 @@
+{
+  "name": "inventory-service",
+  "version": "1.0.0",
+  "description": "Inventory service for hybrid observability demo",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "uuid": "^9.0.1",
+    "pg": "^8.11.3",
+    "pino": "^8.16.2",
+    "@opentelemetry/api": "^1.7.0",
+    "newrelic": "^11.0.0",
+    "@opentelemetry/instrumentation": "^0.53.0",
+    "@opentelemetry/instrumentation-http": "^0.53.0",
+    "@opentelemetry/instrumentation-express": "^0.42.0",
+    "@opentelemetry/instrumentation-pg": "^0.44.0",
+    "@opentelemetry/sdk-node": "^0.45.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.40.3",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.45.1",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.45.1",
+    "@opentelemetry/sdk-metrics": "^1.18.1",
+    "@opentelemetry/resources": "^1.18.1",
+    "@opentelemetry/semantic-conventions": "^1.18.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
