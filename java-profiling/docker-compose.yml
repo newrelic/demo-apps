@@ -1,0 +1,65 @@
+name: java-profiling
+
+services:
+  # =========================================
+  # Java Application Service
+  # =========================================
+  java-app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: java-profiling-app
+    ports:
+      - "8081:8080"
+    environment:
+      # New Relic configuration
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME:-java-profiling-demo}
+      - NEW_RELIC_JFR_ENABLED=true
+      - NEW_RELIC_LOG_LEVEL=${NEW_RELIC_LOG_LEVEL:-info}
+      - NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true
+
+      # Application configuration
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-default}
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    networks:
+      - java-profiling-network
+
+    restart: unless-stopped
+
+  # =========================================
+  # Locust Load Generator Service
+  # =========================================
+  locust:
+    build:
+      context: ./locust
+      dockerfile: Dockerfile
+    container_name: java-profiling-locust
+    environment:
+      - LOCUST_TARGET_HOST=http://java-app:8080
+      - LOCUST_AUTOSTART=${LOCUST_AUTOSTART:-true}
+
+    depends_on:
+      java-app:
+        condition: service_healthy
+
+    networks:
+      - java-profiling-network
+
+    restart: unless-stopped
+
+# =========================================
+# Networks
+# =========================================
+networks:
+  java-profiling-network:
+    driver: bridge
+    name: java-profiling-network
