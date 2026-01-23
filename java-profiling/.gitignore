@@ -1,0 +1,39 @@
+# Environment variables
+.env
+
+# Maven
+app/target/
+app/.mvn/
+app/mvnw
+app/mvnw.cmd
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# New Relic Agent (downloaded at build time)
+newrelic/
+newrelic.jar
+newrelic*.zip
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
