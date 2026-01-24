@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}{{ variety.name }} - Bad Apples Orchard{% endblock %}
+
+{% block content %}
+<section class="variety-detail">
+    <div class="variety-container">
+        <div class="variety-image-large">
+            <img src="{{ url_for('static', filename='images/' + (variety.name|variety_image)) }}"
+                 alt="{{ variety.name }}"
+                 style="width: 100%; max-width: 400px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        </div>
+
+        <div class="variety-info">
+            <h1>{{ variety.name }}</h1>
+            <p class="variety-description">{{ variety.description }}</p>
+
+            <div class="variety-details">
+                <div class="detail-item">
+                    <strong>Price:</strong>
+                    <span class="price-large">${{ "%.2f"|format(variety.price_per_lb|float) }} per lb</span>
+                </div>
+
+                <div class="detail-item">
+                    <strong>Stock:</strong>
+                    {% if variety.stock_lbs > 100 %}
+                    <span class="stock-good">In Stock ({{ variety.stock_lbs }} lbs)</span>
+                    {% elif variety.stock_lbs > 50 %}
+                    <span class="stock-medium">Limited Stock ({{ variety.stock_lbs }} lbs)</span>
+                    {% else %}
+                    <span class="stock-low">Low Stock ({{ variety.stock_lbs }} lbs)</span>
+                    {% endif %}
+                </div>
+
+                <div class="detail-item">
+                    <strong>Orchard Location:</strong>
+                    <span>{{ variety.orchard_location }}</span>
+                </div>
+
+                <div class="detail-item">
+                    <strong>Harvest Season:</strong>
+                    <span>{{ variety.harvest_season }}</span>
+                </div>
+            </div>
+
+            <div class="add-to-cart-section">
+                <label for="quantity">Quantity (lbs):</label>
+                <input type="number" id="quantity" value="1.0" min="0.5" step="0.5" class="quantity-input">
+                <button class="btn btn-primary add-to-cart-btn"
+                        data-variety-id="{{ variety.id }}"
+                        data-variety-name="{{ variety.name }}"
+                        data-price="{{ variety.price_per_lb }}">
+                    Add to Cart
+                </button>
+            </div>
+
+            <div class="actions">
+                <a href="/catalog" class="btn btn-secondary">Back to Catalog</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div id="notification" class="notification hidden"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.querySelector('.add-to-cart-btn').addEventListener('click', async function() {
+    const varietyId = this.getAttribute('data-variety-id');
+    const varietyName = this.getAttribute('data-variety-name');
+    const quantityInput = document.getElementById('quantity');
+    const quantityLbs = parseFloat(quantityInput.value);
+
+    try {
+        const response = await fetch('/api/cart/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                variety_id: parseInt(varietyId),
+                quantity_lbs: quantityLbs
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showNotification(`Added ${quantityLbs}lbs of ${varietyName} to cart!`, 'success');
+            updateCartCount(result.cart_size);
+        } else {
+            showNotification(result.error || 'Failed to add to cart', 'error');
+        }
+    } catch (error) {
+        showNotification('Error adding to cart', 'error');
+    }
+});
+
+function updateCartCount(count) {
+    const cartCountElement = document.getElementById('cart-count');
+    if (cartCountElement) {
+        cartCountElement.textContent = `(${count})`;
+    }
+}
+
+function showNotification(message, type) {
+    const notification = document.getElementById('notification');
+    notification.textContent = message;
+    notification.className = 'notification ' + type;
+    notification.classList.remove('hidden');
+
+    setTimeout(() => {
+        notification.classList.add('hidden');
+    }, 3000);
+}
+</script>
+{% endblock %}
