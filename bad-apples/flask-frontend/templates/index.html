@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Bad Apples Orchard{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Welcome to Bad Apples Orchard</h1>
+    <p>Fresh, locally-grown apples from our family orchards</p>
+    <a href="/catalog" class="btn btn-primary" id="view-catalog">Browse Our Selection</a>
+</div>
+
+<section class="featured-apples">
+    <h2>Featured Varieties</h2>
+    <div class="apple-grid">
+        {% for variety in varieties %}
+        <div class="apple-card">
+            <img src="{{ url_for('static', filename='images/' + (variety.name|variety_image)) }}"
+                 alt="{{ variety.name }}"
+                 class="apple-image">
+            <h3>{{ variety.name }}</h3>
+            <p class="description">{{ variety.description }}</p>
+            <p class="price">${{ "%.2f"|format(variety.price_per_lb|float) }} per lb</p>
+            <p class="stock">Stock: {{ variety.stock_lbs }} lbs</p>
+            <p class="location"><small>{{ variety.orchard_location }} - {{ variety.harvest_season }}</small></p>
+            <button class="btn btn-secondary add-to-cart-btn"
+                    data-variety-id="{{ variety.id }}"
+                    data-variety-name="{{ variety.name }}"
+                    data-price="{{ variety.price_per_lb }}">
+                Add to Cart
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="text-center"><a href="/catalog" class="btn btn-primary">View Full Catalog</a></p>
+</section>
+
+{% if recent_orders %}
+<section class="recent-orders">
+    <h2>Recent Orders</h2>
+    <div class="orders-list">
+        {% for order in recent_orders[:5] %}
+        <div class="order-summary">
+            <p><strong>Order #{{ order.id }}</strong> - {{ order.customer_name }}</p>
+            <p>{{ order['items']|length }} items - ${{ "%.2f"|format(order.total_amount|float) }}</p>
+            <p><small>{{ order.created_at }}</small></p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

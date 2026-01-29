@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout - Bad Apples Orchard{% endblock %}
+
+{% block content %}
+<section class="checkout">
+    <h1>Checkout</h1>
+
+    <div class="checkout-container">
+        <div class="order-summary">
+            <h2>Order Summary</h2>
+            <table class="cart-table">
+                <thead>
+                    <tr>
+                        <th>Apple Variety</th>
+                        <th>Quantity (lbs)</th>
+                        <th>Price/lb</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in cart_items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ "%.1f"|format(item.quantity_lbs) }}</td>
+                        <td>${{ "%.2f"|format(item.price_per_lb|float) }}</td>
+                        <td>${{ "%.2f"|format((item.price_per_lb|float) * (item.quantity_lbs|float)) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3"><strong>Total:</strong></td>
+                        <td><strong>${{ "%.2f"|format(total|float) }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="customer-form">
+            <h2>Delivery Information</h2>
+            <form id="checkout-form">
+                <div class="form-group">
+                    <label for="customer_name">Full Name *</label>
+                    <input type="text" id="customer_name" name="customer_name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="customer_email">Email *</label>
+                    <input type="email" id="customer_email" name="customer_email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="customer_phone">Phone</label>
+                    <input type="tel" id="customer_phone" name="customer_phone">
+                </div>
+
+                <div class="form-group">
+                    <label for="delivery_address">Delivery Address *</label>
+                    <textarea id="delivery_address" name="delivery_address" rows="4" required></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="submit-order">Place Order</button>
+                    <a href="/cart" class="btn btn-secondary">Back to Cart</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+<div id="notification" class="notification hidden"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Track multiple submissions for debugging
+let submissionCount = 0;
+let isProcessing = false;
+
+document.getElementById('checkout-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    submissionCount++;
+    console.log(`[Checkout] Form submission attempt #${submissionCount}`);
+
+    // Log if user is clicking while already processing
+    if (isProcessing) {
+        console.warn(`[Checkout] User clicked submit button while order is already processing (attempt #${submissionCount})`);
+        console.warn('[Checkout] This is a rage click - user does not see any feedback that first click registered');
+        return;
+    }
+
+    isProcessing = true;
+    console.log('[Checkout] Starting order processing...');
+
+    const submitBtn = document.getElementById('submit-order');
+
+    // TODO: Add loading spinner here
+    // TODO: Disable button to prevent double-submission
+
+    const formData = {
+        customer_name: document.getElementById('customer_name').value,
+        customer_email: document.getElementById('customer_email').value,
+        customer_phone: document.getElementById('customer_phone').value,
+        delivery_address: document.getElementById('delivery_address').value
+    };
+
+    console.log(`[Checkout] Processing order for customer: ${formData.customer_email}`);
+
+    // Update New Relic user tracking with email address
+    if (typeof newrelic !== 'undefined' && formData.customer_email) {
+        sessionStorage.setItem('nr_user_id', formData.customer_email);
+        newrelic.setUserId(formData.customer_email);
+        console.log(`[Checkout] Updated New Relic user ID to: ${formData.customer_email}`);
+    }
+
+    // Add delay to show processing state
+    // TODO: Remove this once backend is optimized
+    console.log('[Checkout] Waiting 4 seconds before submitting to backend...');
+    const delayStart = Date.now();
+    await new Promise(resolve => setTimeout(resolve, 4000));
+    const delayEnd = Date.now();
+    console.log(`[Checkout] Delay completed after ${delayEnd - delayStart}ms`);
+
+    try {
+        console.log('[Checkout] Sending order to backend API...');
+        const apiStart = Date.now();
+
+        const response = await fetch('/api/checkout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const apiEnd = Date.now();
+        console.log(`[Checkout] Backend responded in ${apiEnd - apiStart}ms with status ${response.status}`);
+
+        const result = await response.json();
+
+        if (response.ok) {
+            console.log(`[Checkout] Order placed successfully! Order ID: ${result.order_id}`);
+            console.log(`[Checkout] Total submission attempts by user: ${submissionCount}`);
+            if (submissionCount > 1) {
+                console.warn(`[Checkout] User made ${submissionCount - 1} extra clicks due to lack of feedback (rage clicks)`);
+            }
+            showNotification('Order placed successfully!', 'success');
+            setTimeout(() => {
+                console.log('[Checkout] Redirecting to order confirmation page...');
+                window.location.href = '/order/' + result.order_id;
+            }, 1500);
+        } else {
+            console.error(`[Checkout] Order failed: ${result.error || 'Unknown error'}`);
+            isProcessing = false;
+            showNotification(result.error || 'Failed to place order', 'error');
+        }
+    } catch (error) {
+        console.error('[Checkout] Exception during order submission:', error);
+        isProcessing = false;
+        showNotification('Error placing order', 'error');
+    }
+});
+
+function showNotification(message, type) {
+    const notification = document.getElementById('notification');
+    notification.textContent = message;
+    notification.className = 'notification ' + type;
+    notification.classList.remove('hidden');
+
+    setTimeout(() => {
+        notification.classList.add('hidden');
+    }, 3000);
+}
+</script>
+{% endblock %}
