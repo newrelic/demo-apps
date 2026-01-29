@@ -1,4 +1,4 @@
-### The contents of this folder are part of this Microsoft quickstart: https://learn.microsoft.com/en-us/azure/azure-functions/functions-get-started?pivots=programming-language-python
+### The contents of this folder are part of this Microsoft quickstart: [Getting started with Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-get-started?pivots=programming-language-python)
 
 
 

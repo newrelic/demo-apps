@@ -54,3 +54,4 @@ sqlcmd*
 terraform.tfstate*
 main.tfplan
 terraform.tfvars
+scripts/NOTICE.md

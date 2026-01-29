@@ -69,9 +69,13 @@ resource "azurerm_service_plan" "example" {
   os_type             = "Linux"
 }
 
+resource "random_pet" "azurerm_function_app_name" {
+  prefix = "advworks"
+}
+
 # Create a function app
 resource "azurerm_function_app_flex_consumption" "example" {
-  name                = coalesce(var.fa_name, random_string.name.result)
+  name                = random_pet.azurerm_function_app_name.id
   resource_group_name = azurerm_resource_group.example.name
   location            = azurerm_resource_group.example.location
   service_plan_id     = azurerm_service_plan.example.id

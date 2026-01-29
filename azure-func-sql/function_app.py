@@ -18,7 +18,7 @@ app = func.FunctionApp()
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 # --- Database Configuration ---
-DB_SERVER = os.environ.get('DB_SERVER', 'rg-lion.database.windows.net') # Use the service name from docker-compose
+DB_SERVER = os.environ.get('DB_SERVER', 'rg-lion.database.windows.net') # Use the name from the terraform apply
 DB_DATABASE = os.environ.get('DB_DATABASE', 'AdventureWorks')
 DB_USERNAME = os.environ.get('DB_USERNAME', 'azureadmin')
 MSSQL_SA_PASSWORD = os.environ.get('MSSQL_SA_PASSWORD', 'complex_password_here_!23')
@@ -36,6 +36,7 @@ def get_db_connection():
     )
     try:
         logging.info(f"Attempting to connect to {DB_DATABASE} on {DB_SERVER} with {DB_USERNAME} user...")
+        logging.info(f"connection_string: {connection_string}")
         cnxn = pyodbc.connect(connection_string, autocommit=True)
         logging.info("Database connection successful.")
         return cnxn

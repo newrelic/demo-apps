@@ -52,12 +52,6 @@ variable "asp_name" {
   default     = ""
 }
 
-variable "fa_name" {
-  description = "The name of the Function App. If blank, a random name will be generated."
-  type        = string
-  default     = ""
-}
-
 variable "runtime_name" {
   description = "The name of the language worker runtime."
   type        = string
