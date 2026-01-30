@@ -1,0 +1,17 @@
+# A unique prefix for all Azure resources
+project_prefix = "mssql-docker-demo"
+
+# The admin password for the VM (SSH) and SQL Managed Instance.
+# MUST be complex (e.g., "P@ssw0rd12345!")
+admin_password   = "YourComplexSQLPassword123!"
+
+# Your local public IP address. Find it by searching "what is my ip" in Google.
+# This is required to secure access to the VM.
+my_ip_address_start = ""
+my_ip_address_end   = ""
+
+# Details for New Relic instrumentation
+new_relic_license_key        = "YOUR_INGEST_LICENSE_KEY"
+new_relic_app_name           = "YOUR_APP_NAME"
+new_relic_team_tag           = ""
+new_relic_environment_tag    = ""

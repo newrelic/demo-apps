@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+    
+    <title>AdventureWorks Query Runner</title>
+    <link rel="icon" href="static/logo.svg" type="image/svg+xml">    
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background-color: #1D252C;
+            color: #EFF0F0;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background-color: #2b3640;
+            border: 1px solid #555B61;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            border-radius: 8px;
+            padding: 2rem;
+            position: relative;
+        }
+        h1 {
+            color: #00FF8C;
+            border-bottom: 2px solid #00FF8C;
+            padding-bottom: 0.5rem;
+            margin-top: 0;
+        }
+        h2 {
+            font-size: 1.25rem;
+            color: #00FF8C;
+            margin-top: 0;
+        }
+        p {
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        .scenario {
+            margin-bottom: 2rem;
+            border: 1px solid #555B61;
+            background-color: #1D252C;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        button {
+            background-color: #00FF8C;
+            color: #1D252C;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        button:hover {
+            background-color: #1CE783;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.25);
+        }
+        #results {
+            margin-top: 2rem;
+            background-color: #1D252C;
+            color: #f8f8f2;
+            border: 1px solid #555B61;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-height: 50px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AdventureWorks Query Demonstrator</h1>
+        <p>Click the buttons below to execute different types of SQL queries against the database. The JSON results will be displayed at the bottom.</p>
+
+        <div class="scenario">
+            <h2>Standard Queries</h2>
+            <p>These queries represent typical, efficient application behavior.</p>
+            <div class="buttons">
+                <button data-endpoint="/query/normal">Fast Query (Get Orders)</button>
+                <button data-endpoint="/query/wait">Slow Query (Waitfor)</button>
+                <button data-endpoint="/query/missing_index">Problem Query (Missing Index)</button>
+            </div>
+        </div>
+
+        <h2>Results</h2>
+        <pre id="results">Awaiting query...</pre>
+    </div>
+
+    <script>
+        const resultsEl = document.getElementById('results');
+
+        // --- Query Execution Logic ---
+        async function runQuery(endpoint) {
+            resultsEl.textContent = 'Executing...';
+            console.log(`[CLIENT] Executing query for endpoint: ${endpoint}`);
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'GET'
+                });
+                
+                console.log(`[CLIENT] Received response for "${endpoint}". Status: ${response.status} ${response.statusText}`);
+                const data = await response.json();
+                console.log(`[CLIENT] Parsed JSON data for "${endpoint}":`);
+                console.log(data);
+                
+                resultsEl.textContent = JSON.stringify(data, null, 2);
+
+                if (!response.ok) {
+                    console.error(`[CLIENT] Server returned an error for "${endpoint}": ${data.error || `HTTP status ${response.status}`}`);
+                }
+
+            } catch (error) {
+                resultsEl.textContent = `Error: ${error.message}`;
+                console.error(`[CLIENT] An error occurred while fetching from endpoint "${endpoint}":`);
+                console.error(error);
+            }
+        }
+
+        // --- Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Attach listeners to query buttons
+            const queryButtons = document.querySelectorAll('button[data-endpoint]');
+            queryButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const endpoint = button.dataset.endpoint;
+                    runQuery(endpoint);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
