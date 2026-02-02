@@ -19,10 +19,13 @@ async function slowPaymentScenario(driver, storefrontUrl) {
   // Wait for page to load
   await driver.wait(until.elementLocated(By.css('.app')), WAIT_TIMEOUT);
 
-  // Select OTel variant for this scenario
-  console.log('  → Selecting OTel variant');
+  // Select a backend variant (rotate through variants)
+  const variants = ['apm', 'otel', 'hybrid', 'mixed'];
+  const variant = variants[Math.floor(Math.random() * variants.length)];
+
+  console.log(`  → Selecting variant: ${variant}`);
   const variantSelect = await driver.findElement(By.id('variant-select'));
-  await variantSelect.sendKeys('otel');
+  await variantSelect.sendKeys(variant);
 
   // Add expensive items to create a large order
   console.log('  → Adding Gaming Laptop to cart');

@@ -25,6 +25,7 @@ services:
   # ============================================================================
 
   order-service-apm:
+    profiles: ["separate-stacks"]
     build:
       context: .
       dockerfile: services/order-service/Dockerfile.apm
@@ -50,6 +51,7 @@ services:
       - hybrid-agent-network
 
   inventory-service-apm:
+    profiles: ["separate-stacks"]
     build:
       context: .
       dockerfile: services/inventory-service/Dockerfile.apm
@@ -73,6 +75,7 @@ services:
       - hybrid-agent-network
 
   payment-service-apm:
+    profiles: ["separate-stacks"]
     build:
       context: .
       dockerfile: services/payment-service/Dockerfile.apm
@@ -94,6 +97,7 @@ services:
   # ============================================================================
 
   order-service-otel:
+    profiles: ["separate-stacks"]
     build:
       context: .
       dockerfile: services/order-service/Dockerfile.otel
@@ -120,6 +124,7 @@ services:
       - hybrid-agent-network
 
   inventory-service-otel:
+    profiles: ["separate-stacks"]
     build:
       context: .
       dockerfile: services/inventory-service/Dockerfile.otel
@@ -144,6 +149,7 @@ services:
       - hybrid-agent-network
 
   payment-service-otel:
+    profiles: ["separate-stacks"]
     build:
       context: .
       dockerfile: services/payment-service/Dockerfile.otel
@@ -166,6 +172,7 @@ services:
   # ============================================================================
 
   order-service-hybrid:
+    profiles: ["separate-stacks"]
     build:
       context: .
       dockerfile: services/order-service/Dockerfile.hybrid
@@ -192,6 +199,7 @@ services:
       - hybrid-agent-network
 
   inventory-service-hybrid:
+    profiles: ["separate-stacks"]
     build:
       context: .
       dockerfile: services/inventory-service/Dockerfile.hybrid
@@ -216,6 +224,7 @@ services:
       - hybrid-agent-network
 
   payment-service-hybrid:
+    profiles: ["separate-stacks"]
     build:
       context: .
       dockerfile: services/payment-service/Dockerfile.hybrid
@@ -230,6 +239,82 @@ services:
       - PAYMENT_ERROR_RATE=${PAYMENT_ERROR_RATE:-0.1}
     ports:
       - "5002:5002"
+    networks:
+      - hybrid-agent-network
+
+  # ============================================================================
+  # Mixed Mode Services (Single Stack with Different Variants)
+  # ============================================================================
+
+  order-service-mixed:
+    profiles: ["mixed-mode"]
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile.hybrid
+    container_name: order-service-mixed
+    environment:
+      - VARIANT=hybrid
+      - PORT=3000
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=${MIXED_ORDER_SERVICE_NAME:-NRDEMO Order Service (Mixed-Hybrid)}
+      - NEW_RELIC_REGION=${NEW_RELIC_REGION:-US}
+      - INVENTORY_SERVICE_HOST=inventory-service-mixed
+      - INVENTORY_SERVICE_PORT=4000
+      - PAYMENT_SERVICE_HOST=payment-service-mixed
+      - PAYMENT_SERVICE_PORT=5001
+      - DB_HOST=postgres
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-ecommerce}
+      - DB_USER=${DB_USER:-appuser}
+      - DB_PASSWORD=${DB_PASSWORD:-apppassword}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hybrid-agent-network
+
+  inventory-service-mixed:
+    profiles: ["mixed-mode"]
+    build:
+      context: .
+      dockerfile: services/inventory-service/Dockerfile.apm
+    container_name: inventory-service-mixed
+    environment:
+      - VARIANT=apm
+      - PORT=4000
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=${MIXED_INVENTORY_SERVICE_NAME:-NRDEMO Inventory Service (Mixed-APM)}
+      - DB_HOST=postgres
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-ecommerce}
+      - DB_USER=${DB_USER:-appuser}
+      - DB_PASSWORD=${DB_PASSWORD:-apppassword}
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hybrid-agent-network
+
+  payment-service-mixed:
+    profiles: ["mixed-mode"]
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile.otel
+    container_name: payment-service-mixed
+    environment:
+      - VARIANT=otel
+      - PORT=5001
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=${MIXED_PAYMENT_SERVICE_NAME:-NRDEMO Payment Service (Mixed-OTel)}
+      - NEW_RELIC_REGION=${NEW_RELIC_REGION:-US}
+      - PAYMENT_DELAY_MS=${PAYMENT_DELAY_MS:-2000}
+      - PAYMENT_ERROR_RATE=${PAYMENT_ERROR_RATE:-0.1}
+    ports:
+      - "5001:5001"
     networks:
       - hybrid-agent-network
 
@@ -249,10 +334,6 @@ services:
       - NEW_RELIC_TRUST_KEY=${NEW_RELIC_TRUST_KEY:-}
     ports:
       - "8080:80"
-    depends_on:
-      - order-service-apm
-      - order-service-otel
-      - order-service-hybrid
     networks:
       - hybrid-agent-network
 

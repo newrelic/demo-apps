@@ -49,8 +49,10 @@ router.post('/checkout', async (req, res) => {
     logger.info({ orderId, totalAmount }, 'Calculated order total');
 
     // Get inventory service URL based on variant
+    const inventoryHost = process.env.INVENTORY_SERVICE_HOST ||
+                         `inventory-service-${process.env.VARIANT || 'apm'}`;
     const inventoryPort = process.env.INVENTORY_SERVICE_PORT || 4000;
-    const inventoryUrl = `http://inventory-service-${process.env.VARIANT || 'apm'}:${inventoryPort}`;
+    const inventoryUrl = `http://${inventoryHost}:${inventoryPort}`;
 
     // Reserve inventory
     logger.info({ orderId, inventoryUrl }, 'Reserving inventory');
@@ -84,8 +86,10 @@ router.post('/checkout', async (req, res) => {
     logger.info({ orderId, reservationId: reservationResponse.data.reservationId }, 'Inventory reserved');
 
     // Get payment service URL based on variant
+    const paymentHost = process.env.PAYMENT_SERVICE_HOST ||
+                       `payment-service-${process.env.VARIANT || 'apm'}`;
     const paymentPort = process.env.PAYMENT_SERVICE_PORT || 5000;
-    const paymentUrl = `http://payment-service-${process.env.VARIANT || 'apm'}:${paymentPort}`;
+    const paymentUrl = `http://${paymentHost}:${paymentPort}`;
 
     // Process payment
     logger.info({ orderId, paymentUrl, amount: totalAmount }, 'Processing payment');

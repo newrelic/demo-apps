@@ -81,6 +81,7 @@ metricExporter.export = function(metrics, resultCallback) {
 const resource = new Resource({
   [SemanticResourceAttributes.SERVICE_NAME]: process.env.NEW_RELIC_APP_NAME || 'NRDEMO Order Service (OTel)',
   [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
+  [SemanticResourceAttributes.SERVICE_INSTANCE_ID]: `${process.env.NEW_RELIC_APP_NAME || 'order-service'}-${require('os').hostname()}`,
   'telemetry.sdk.language': 'nodejs'
 });
 

@@ -21,7 +21,7 @@ async function happyPathScenario(driver, storefrontUrl) {
   await driver.wait(until.elementLocated(By.css('.app')), WAIT_TIMEOUT);
 
   // Select a backend variant (rotate through variants)
-  const variants = ['apm', 'otel', 'hybrid'];
+  const variants = ['apm', 'otel', 'hybrid', 'mixed'];
   const variant = variants[Math.floor(Math.random() * variants.length)];
 
   console.log(`  → Selecting variant: ${variant}`);

@@ -12,6 +12,47 @@ This demo provides a side-by-side comparison of three instrumentation strategies
 
 All three variants run simultaneously, allowing you to compare distributed tracing, logs in context, and observability capabilities across different instrumentation approaches.
 
+## Deployment Modes
+
+This application supports two deployment modes, controlled by the `NR_MIXED_MODE` environment variable in `.env`:
+
+### Separate Stacks Mode (Default)
+
+**Configuration:** Set `NR_MIXED_MODE=false` in `.env`
+
+Runs 3 complete stacks (9 service containers total):
+- **APM Stack**: Order (port 3000), Inventory (port 4000), Payment (port 5000)
+- **OTel Stack**: Order (port 3001), Inventory (port 4001), Payment (port 5001)
+- **Hybrid Stack**: Order (port 3002), Inventory (port 4002), Payment (port 5002)
+
+Each stack uses the same instrumentation type across all services, making it easy to compare the three approaches side-by-side.
+
+**Start command:**
+```bash
+docker-compose --profile separate-stacks up -d
+```
+
+### Mixed-Mode Stack
+
+**Configuration:** Set `NR_MIXED_MODE=true` in `.env`
+
+Runs a single stack with different telemetry per service (3 service containers total):
+- **Order Service**: Hybrid instrumentation (port 3000)
+- **Inventory Service**: APM instrumentation (port 4000)
+- **Payment Service**: OTel instrumentation (port 5001)
+
+This demonstrates how New Relic maintains connected experiences across different instrumentation types within a single application stack. Perfect for showing SCs that you can mix instrumentation approaches in real-world scenarios.
+
+**Start command:**
+```bash
+docker-compose --profile mixed-mode up -d
+```
+
+**Stop all services:**
+```bash
+docker-compose --profile separate-stacks --profile mixed-mode down
+```
+
 ## Architecture
 
 ### Services
@@ -155,14 +196,31 @@ NEW_RELIC_BROWSER_APP_ID=your_browser_app_id
 **Note on Browser Monitoring:**
 Browser monitoring is **optional**. If you don't configure the `NEW_RELIC_BROWSER_*` variables (or leave them as the default placeholder values), the demo will run perfectly fine with just APM/OTel/Hybrid backend instrumentation. Browser monitoring adds frontend correlation but is not required to see distributed traces.
 
-### 3. Start the Demo
+### 3. Choose Deployment Mode
 
+Configure the deployment mode in `.env`:
+- `NR_MIXED_MODE=false` - Separate stacks mode (9 services - default)
+- `NR_MIXED_MODE=true` - Mixed-mode stack (3 services with different instrumentation)
+
+See the [Deployment Modes](#deployment-modes) section for details on the differences.
+
+### 4. Start the Demo
+
+**Separate Stacks Mode (Default):**
 ```bash
 # Build and start all services (this will take a few minutes on first run)
-docker-compose up --build
+docker-compose --profile separate-stacks up --build -d
+```
 
-# Or run in detached mode
-docker-compose up --build -d
+**Mixed-Mode Stack:**
+```bash
+# Build and start the mixed-mode stack
+docker-compose --profile mixed-mode up --build -d
+```
+
+**Stop all services:**
+```bash
+docker-compose --profile separate-stacks --profile mixed-mode down
 ```
 
 **Running without Browser Monitoring:**
@@ -175,36 +233,45 @@ If you skip configuring the Browser agent variables (leave them as defaults), th
 
 This is perfectly fine for demonstrating backend observability!
 
-### 4. Access the Application
+### 5. Access the Application
 
 - **Storefront**: http://localhost:8080
 - **APM Order Service**: http://localhost:3000/health
 - **OTel Order Service**: http://localhost:3001/health
 - **Hybrid Order Service**: http://localhost:3002/health
+- **Mixed-Mode Order Service** (when NR_MIXED_MODE=true): http://localhost:3000/health
 
-### 5. View Traces in New Relic
+### 6. View Traces in New Relic
 
 1. Go to **APM & Services** in New Relic
-2. You should see 9 services (3 per variant):
+2. **Separate Stacks Mode**: You should see 9 services (3 per variant):
    - NRDEMO Order Service (APM/OTel/Hybrid)
    - NRDEMO Inventory Service (APM/OTel/Hybrid)
    - NRDEMO Payment Service (APM/OTel/Hybrid)
+
+   **Mixed-Mode Stack**: You should see 3 services:
+   - NRDEMO Order Service (Mixed-Hybrid)
+   - NRDEMO Inventory Service (Mixed-APM)
+   - NRDEMO Payment Service (Mixed-OTel)
 3. Click any service → **Distributed tracing** to see traces
 4. View **Logs in context** for correlated log entries
-5. Check **Service map** to visualize dependencies
+5. Check **Service map** to visualize dependencies across different instrumentation types
 
 ## Using the Demo
 
 ### Manual Testing
 
 1. Open http://localhost:8080 in your browser
-2. Select a backend variant from the dropdown (APM, OTel, or Hybrid)
+2. Select a backend variant from the dropdown:
+   - **Separate Stacks Mode**: APM, OTel, or Hybrid
+   - **Mixed-Mode Stack**: Mixed-Mode (demonstrates cross-variant tracing)
 3. Add products to cart
 4. Click "Proceed to Checkout"
 5. Fill in customer ID (e.g., `CUST-001`)
 6. Click "Complete Order"
 7. Wait ~2 seconds for payment processing
 8. View the distributed trace in New Relic
+   - In mixed-mode, you'll see Order (Hybrid) → Inventory (APM) → Payment (OTel) in a single trace
 
 ### Automated Load Generation
 

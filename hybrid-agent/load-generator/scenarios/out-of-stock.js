@@ -19,10 +19,13 @@ async function outOfStockScenario(driver, storefrontUrl) {
   // Wait for page to load
   await driver.wait(until.elementLocated(By.css('.app')), WAIT_TIMEOUT);
 
-  // Select hybrid variant to test error handling
-  console.log('  → Selecting hybrid variant');
+  // Select a backend variant (rotate through variants to test error handling)
+  const variants = ['apm', 'otel', 'hybrid', 'mixed'];
+  const variant = variants[Math.floor(Math.random() * variants.length)];
+
+  console.log(`  → Selecting variant: ${variant}`);
   const variantSelect = await driver.findElement(By.id('variant-select'));
-  await variantSelect.sendKeys('hybrid');
+  await variantSelect.sendKeys(variant);
 
   // Try to add out-of-stock headset - button should be disabled
   console.log('  → Checking headset is out of stock');

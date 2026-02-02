@@ -9,7 +9,8 @@ import axios from 'axios';
 const BACKEND_URLS = {
   apm: 'http://localhost:3000',
   otel: 'http://localhost:3001',
-  hybrid: 'http://localhost:3002'
+  hybrid: 'http://localhost:3002',
+  mixed: 'http://localhost:3000'  // Mixed mode uses port 3000
 };
 
 // In Docker environment, use internal service names
@@ -19,6 +20,7 @@ if (isDocker) {
   BACKEND_URLS.apm = 'http://order-service-apm:3000';
   BACKEND_URLS.otel = 'http://order-service-otel:3000';
   BACKEND_URLS.hybrid = 'http://order-service-hybrid:3000';
+  BACKEND_URLS.mixed = 'http://order-service-mixed:3000';
 }
 
 /**
@@ -88,6 +90,7 @@ export function getAvailableVariants() {
   return [
     { value: 'apm', label: 'APM - New Relic Native', description: 'New Relic APM agent' },
     { value: 'otel', label: 'OTel - OpenTelemetry', description: 'OpenTelemetry SDK' },
-    { value: 'hybrid', label: 'Hybrid - APM + OTel API', description: 'New Relic with OTel bridge' }
+    { value: 'hybrid', label: 'Hybrid - APM + OTel API', description: 'New Relic with OTel bridge' },
+    { value: 'mixed', label: 'Mixed-Mode - Cross-variant Stack', description: 'Order(Hybrid) + Inventory(APM) + Payment(OTel)' }
   ];
 }

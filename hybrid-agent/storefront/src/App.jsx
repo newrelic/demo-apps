@@ -86,6 +86,7 @@ function App() {
             <option value="apm">APM - New Relic Native</option>
             <option value="otel">OTel - OpenTelemetry</option>
             <option value="hybrid">Hybrid - APM + OTel API</option>
+            <option value="mixed">Mixed-Mode - Cross-variant Stack</option>
           </select>
         </div>
       </header>
