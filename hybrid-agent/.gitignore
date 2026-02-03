@@ -1,0 +1,38 @@
+# Environment variables
+.env
+
+# Node modules
+node_modules/
+*/node_modules/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+.next/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker volumes
+postgres-data/
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
