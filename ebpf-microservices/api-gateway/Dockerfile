@@ -1,4 +1,4 @@
-FROM rust:1.83-slim AS builder
+FROM rust:1.93-slim AS builder
 
 WORKDIR /usr/src/app
 
@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 ENV CARGO_HTTP_CHECK_REVOKE=false
 
 # Copy manifests
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock* ./
 
 # Create a dummy main.rs to build dependencies
 RUN mkdir src && \
