@@ -49,8 +49,17 @@ Edit `.env` and set the following values:
 ```bash
 NR_LICENSE_KEY=your_license_key_here
 NR_ENVIRONMENT=us_prod  # Options: us_prod, eu_prod, staging
-NR_LOGTYPE=demo_app_logs  # Custom identifier for your logs
+NR_LOGTYPE=your_name_demo_logs  # Example: jsmith_demo_logs
 ```
+
+> ⚠️ **IMPORTANT: NR_LOGTYPE is Required**
+>
+> `NR_LOGTYPE` must be a **unique identifier** that distinguishes your logs from others in shared environments. Without a unique value:
+> - Your logs may collide with another user's parsing rules
+> - You risk seeing incorrect or broken log data
+> - Your parsing rules may affect other users' logs
+>
+> **The script will not execute without this value set.**
 
 To get your License Key:
 1. Log in to New Relic
@@ -81,7 +90,7 @@ You can override environment variables using command-line arguments:
 python send_logs.py --log_file logs.jsonc \
   --license_key YOUR_LICENSE_KEY \
   --environment us_prod \
-  --logtype custom_log_type
+  --logtype your_name_demo_logs
 ```
 
 ### Command-Line Options
@@ -98,6 +107,8 @@ python send_logs.py --log_file logs.jsonc \
   - `staging`: Staging environment
 
 - `--logtype` (optional): Override the log type identifier from `.env`
+  - **Must be unique** to avoid conflicts in shared environments
+  - Example: `--logtype your_name_demo_logs`
 
 ## Workflow
 
@@ -170,8 +181,6 @@ The included `logs.jsonc` file contains 30 sample log entries from three differe
 - **Checkout Service** (10 entries): User checkout events with purchase details, amounts, and status
 - **Shipping Service** (10 entries): Shipping tracking updates with carrier information and delivery status
 - **Auth Service** (10 entries): Authentication events with login attempts, methods, and results
-
-Each service uses a different log format with pipe-delimited key-value pairs to demonstrate various parsing patterns.
 
 ## Troubleshooting
 
