@@ -1,0 +1,46 @@
+[
+  // ==========================================
+  // 1. CHECKOUT SERVICE (parsing-demo-checkout-service)
+  // 10 entries reflecting the crew's various spending habits.
+  // ==========================================
+  { "message": "event_type:checkout_event | user_id:mal_reynolds | action:purchase | total_price:550.00 | item_count:2 | status:success", "level": "INFO", "service.name": "parsing-demo-checkout-service" },
+  { "message": "event_type:checkout_event | user_id:zoe_washburne | action:purchase | total_price:120.45 | item_count:1 | status:success", "level": "INFO", "service.name": "parsing-demo-checkout-service" },
+  { "message": "event_type:checkout_event | user_id:hoban_washburne | action:purchase | total_price:15.00 | item_count:3 | status:failed", "level": "ERROR", "service.name": "parsing-demo-checkout-service" },
+  { "message": "event_type:checkout_event | user_id:kaylee_frye | action:purchase | total_price:2100.00 | item_count:12 | status:success", "level": "INFO", "service.name": "parsing-demo-checkout-service" },
+  { "message": "event_type:checkout_event | user_id:jayne_cobb | action:purchase | total_price:45.00 | item_count:1 | status:cancelled", "level": "WARN", "service.name": "parsing-demo-checkout-service" },
+  { "message": "event_type:checkout_event | user_id:inara_serra | action:purchase | total_price:850.00 | item_count:4 | status:success", "level": "INFO", "service.name": "parsing-demo-checkout-service" },
+  { "message": "event_type:checkout_event | user_id:simon_tam | action:purchase | total_price:1200.00 | item_count:8 | status:success", "level": "INFO", "service.name": "parsing-demo-checkout-service" },
+  { "message": "event_type:checkout_event | user_id:river_tam | action:purchase | total_price:0.50 | item_count:1 | status:success", "level": "INFO", "service.name": "parsing-demo-checkout-service" },
+  { "message": "event_type:checkout_event | user_id:shepherd_book | action:purchase | total_price:30.00 | item_count:2 | status:success", "level": "INFO", "service.name": "parsing-demo-checkout-service" },
+  { "message": "event_type:checkout_event | user_id:badger_shady | action:purchase | total_price:5000.00 | item_count:1 | status:failed", "level": "ERROR", "service.name": "parsing-demo-checkout-service" },
+
+  // ==========================================
+  // 2. SHIPPING SERVICE (parsing-demo-shipping-service)
+  // 10 entries tracking cargo across the 'Verse.
+  // ==========================================
+  { "message": "service_type:shipping | carrier_name:serenity_cargo | tracking_id:trk_firefly_01 | status_update:in_transit | est_days:2", "level": "INFO", "service.name": "parsing-demo-shipping-service" },
+  { "message": "service_type:shipping | carrier_name:alliance_express | tracking_id:trk_central_99 | status_update:delayed | est_days:14", "level": "WARN", "service.name": "parsing-demo-shipping-service" },
+  { "message": "service_type:shipping | carrier_name:serenity_cargo | tracking_id:trk_firefly_02 | status_update:delivered | est_days:0", "level": "INFO", "service.name": "parsing-demo-shipping-service" },
+  { "message": "service_type:shipping | carrier_name:blue_sun_corp | tracking_id:trk_bsc_552 | status_update:in_transit | est_days:5", "level": "INFO", "service.name": "parsing-demo-shipping-service" },
+  { "message": "service_type:shipping | carrier_name:serenity_cargo | tracking_id:trk_firefly_03 | status_update:picked_up | est_days:3", "level": "INFO", "service.name": "parsing-demo-shipping-service" },
+  { "message": "service_type:shipping | carrier_name:alliance_express | tracking_id:trk_central_102 | status_update:seized | est_days:99", "level": "ERROR", "service.name": "parsing-demo-shipping-service" },
+  { "message": "service_type:shipping | carrier_name:blue_sun_corp | tracking_id:trk_bsc_558 | status_update:delivered | est_days:0", "level": "INFO", "service.name": "parsing-demo-shipping-service" },
+  { "message": "service_type:shipping | carrier_name:serenity_cargo | tracking_id:trk_firefly_04 | status_update:out_for_delivery | est_days:1", "level": "INFO", "service.name": "parsing-demo-shipping-service" },
+  { "message": "service_type:shipping | carrier_name:dhl_border | tracking_id:trk_ext_881 | status_update:in_transit | est_days:7", "level": "INFO", "service.name": "parsing-demo-shipping-service" },
+  { "message": "service_type:shipping | carrier_name:serenity_cargo | tracking_id:trk_firefly_05 | status_update:delayed | est_days:4", "level": "WARN", "service.name": "parsing-demo-shipping-service" },
+
+  // ==========================================
+  // 3. AUTH SERVICE (parsing-demo-auth-service)
+  // 10 entries with login attempts (and failures) for the crew.
+  // ==========================================
+  { "message": "auth_event:login | auth_method:biometric | user_account:mal_reynolds_at_serenity_io | auth_result:success | client_origin:172.16.0.1", "level": "INFO", "service.name": "parsing-demo-auth-service" },
+  { "message": "auth_event:login | auth_method:password | user_account:zoe_washburne_at_serenity_io | auth_result:success | client_origin:172.16.0.2", "level": "INFO", "service.name": "parsing-demo-auth-service" },
+  { "message": "auth_event:login | auth_method:password | user_account:hoban_washburne_at_serenity_io | auth_result:failure | client_origin:172.16.0.3", "level": "WARN", "service.name": "parsing-demo-auth-service" },
+  { "message": "auth_event:login | auth_method:oauth2 | user_account:kaylee_frye_at_serenity_io | auth_result:success | client_origin:172.16.0.4", "level": "INFO", "service.name": "parsing-demo-auth-service" },
+  { "message": "auth_event:login | auth_method:password | user_account:jayne_cobb_at_serenity_io | auth_result:blocked | client_origin:203.0.113.5", "level": "ERROR", "service.name": "parsing-demo-auth-service" },
+  { "message": "auth_event:login | auth_method:saml | user_account:inara_serra_at_serenity_io | auth_result:success | client_origin:172.16.0.5", "level": "INFO", "service.name": "parsing-demo-auth-service" },
+  { "message": "auth_event:login | auth_method:password | user_account:simon_tam_at_serenity_io | auth_result:success | client_origin:172.16.0.6", "level": "INFO", "service.name": "parsing-demo-auth-service" },
+  { "message": "auth_event:login | auth_method:biometric | user_account:river_tam_at_serenity_io | auth_result:success | client_origin:172.16.0.7", "level": "INFO", "service.name": "parsing-demo-auth-service" },
+  { "message": "auth_event:login | auth_method:password | user_account:shepherd_book_at_serenity_io | auth_result:success | client_origin:172.16.0.8", "level": "INFO", "service.name": "parsing-demo-auth-service" },
+  { "message": "auth_event:login | auth_method:password | user_account:badger_shady_at_persephone_com | auth_result:failure | client_origin:192.0.2.14", "level": "WARN", "service.name": "parsing-demo-auth-service" }
+]
