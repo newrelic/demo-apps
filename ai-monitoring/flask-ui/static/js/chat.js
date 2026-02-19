@@ -101,8 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Send message
     sendBtn.addEventListener('click', async () => {
-        const message = chatInput.value.trim();
-        if (!message) return;
+        const message = chatInput.value;
 
         const model = modelSelect.value;
         const endpoint = model === 'compare' ? '/chat/compare' : '/chat/send';

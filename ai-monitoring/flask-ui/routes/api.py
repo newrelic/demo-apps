@@ -56,8 +56,8 @@ def agent_minimal_repair():
 
     try:
         response = agent_client.session.post(
-            f"{agent_client.base_url}/repair/minimal",
-            params={"model": model},
+            f"{agent_client.base_url}/repair",
+            params={"model": model, "workflow": "minimal_single_tool"},
             timeout=150
         )
         response.raise_for_status()
@@ -74,8 +74,8 @@ def agent_manual_repair():
 
     try:
         response = agent_client.session.post(
-            f"{agent_client.base_url}/repair/manual",
-            params={"model": model},
+            f"{agent_client.base_url}/repair",
+            params={"model": model, "workflow": "forced_full_repair"},
             timeout=150
         )
         response.raise_for_status()
