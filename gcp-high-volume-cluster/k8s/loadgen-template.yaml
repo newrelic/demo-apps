@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen-{{NUM}}
+  namespace: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgen-{{NUM}}
+  template:
+    metadata:
+      labels:
+        app: loadgen-{{NUM}}
+    spec:
+      containers:
+      - name: locust
+        image: gcr.io/{{PROJECT_ID}}/loadgen:latest
+        env:
+        - name: TARGET_HOST
+          value: "http://app-{{NUM}}:8080"
+        - name: USERS
+          value: "{{USERS}}"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

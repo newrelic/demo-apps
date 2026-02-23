@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+  labels:
+    name: prod
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: newrelic-license
+  namespace: prod
+type: Opaque
+data:
+  # Base64 encoded NEW_RELIC_LICENSE_KEY
+  # Set via: kubectl create secret generic newrelic-license --from-literal=license-key=YOUR_KEY -n prod
+  license-key: ""

@@ -1,0 +1,23 @@
+# Environment files
+.env
+
+# Generated Kubernetes manifests
+k8s/apps.yaml
+k8s/loadgens.yaml
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/terraform.tfvars
+
+# Maven
+app/target/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store

@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-{{NUM}}
+  namespace: prod
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: app-{{NUM}}
+  template:
+    metadata:
+      labels:
+        app: app-{{NUM}}
+      annotations:
+        instrumentation.newrelic.com/inject-java: "true"
+    spec:
+      containers:
+      - name: app
+        image: gcr.io/{{PROJECT_ID}}/hello-world:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SERVICE_NAME
+          value: "app-{{NUM}}"
+        - name: NEW_RELIC_APP_NAME
+          value: "GCP High Volume - App {{NUM}}"
+        - name: NEW_RELIC_LICENSE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: newrelic-license
+              key: license-key
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-{{NUM}}
+  namespace: prod
+spec:
+  selector:
+    app: app-{{NUM}}
+  ports:
+  - port: 8080
+    targetPort: 8080

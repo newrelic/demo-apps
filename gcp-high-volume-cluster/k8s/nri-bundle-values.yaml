@@ -1,0 +1,19 @@
+global:
+  licenseKey: ${NEW_RELIC_LICENSE_KEY}
+  cluster: gcp-high-volume-cluster
+
+newrelic-infrastructure:
+  enabled: true
+  privileged: true
+
+ksm:
+  enabled: true
+
+kubeEvents:
+  enabled: true
+
+k8s-agents-operator:
+  enabled: true
+
+newrelic-logging:
+  enabled: true
