@@ -9,16 +9,16 @@
 {% block content %}
 <div class="debug-container">
     <h1>🔬 Debug & Diagnostics</h1>
-    <p>Test tools to diagnose PydanticAI hanging issues</p>
+    <p>Test tools to diagnose LangChain agent and Ollama connectivity issues</p>
 
     <hr style="margin: 20px 0;">
 
-    <!-- Test 1: Minimal Agent (No Tools) -->
+    <!-- Test 1: Chat Agent -->
     <section class="test-section" style="margin-bottom: 30px;">
-        <h2>Test 1: Minimal Agent (No Tools)</h2>
+        <h2>Test 1: Chat Agent</h2>
         <p style="color: #666; font-size: 14px;">
-            Tests a PydanticAI agent with <strong>NO tools attached</strong>.
-            If this hangs, the issue is in PydanticAI itself, not tool registration.
+            Tests the full LangChain agent pipeline via the <strong>/chat</strong> endpoint.
+            If this hangs, the issue is in the agent or Ollama connectivity.
         </p>
 
         <div style="margin: 15px 0;">
@@ -46,10 +46,10 @@
 
     <!-- Test 2: Direct LLM Call -->
     <section class="test-section" style="margin-bottom: 30px;">
-        <h2>Test 2: Direct LLM Call (Bypass PydanticAI)</h2>
+        <h2>Test 2: Direct LLM Call (Bypass Agent)</h2>
         <p style="color: #666; font-size: 14px;">
-            Calls Ollama directly via HTTP, completely bypassing PydanticAI.
-            If this works but Test 1 hangs, the issue is definitely in PydanticAI.
+            Calls Ollama directly via ChatOpenAI, bypassing the ReAct agent and tools.
+            If this works but Test 1 hangs, the issue is in agent orchestration, not Ollama.
         </p>
 
         <div style="margin: 15px 0;">
@@ -71,12 +71,12 @@
 
     <hr style="margin: 30px 0;">
 
-    <!-- Test 3: Minimal Repair (2 Tools Only) -->
+    <!-- Test 3: Minimal Repair (Single Tool) -->
     <section class="test-section" style="margin-bottom: 30px;">
-        <h2>Test 3: Minimal Repair (Only 2 Tools)</h2>
+        <h2>Test 3: Minimal Repair (Single Tool Call)</h2>
         <p style="color: #666; font-size: 14px;">
-            Tests a repair agent with <strong>ONLY 2 tools</strong> (docker_ps + docker_restart) and a short prompt (~200 tokens).
-            If this works but full repair fails, the issue is context/compute limitations.
+            Runs the <strong>minimal_single_tool</strong> workflow: calls system_health once, then stops.
+            If this works but full repair fails, the issue is with multi-step reasoning or context limits.
         </p>
 
         <div style="margin: 15px 0;">
@@ -99,14 +99,14 @@
 
     <hr style="margin: 30px 0;">
 
-    <!-- Test 4: Manual Tool Orchestration -->
+    <!-- Test 4: Full Repair Workflow -->
     <section class="test-section" style="margin-bottom: 30px;">
-        <h2>Test 4: Manual Tool Orchestration</h2>
+        <h2>Test 4: Full Repair Workflow (3 Tool Calls)</h2>
         <p style="color: #666; font-size: 14px;">
-            <strong>Bypasses PydanticAI entirely</strong>. Directly calls Ollama, parses tool calls from text, executes them, and feeds results back in a loop.
-            This works around Ollama's lack of OpenAI-style function calling support.
+            Runs the <strong>forced_full_repair</strong> workflow: health check, restart api-gateway, verify health.
+            Tests multi-step ReAct reasoning with 3 sequential tool calls.
             <br><br>
-            <em>Use this when Test 3 shows 0 tool calls (model responds with text instead of executing tools).</em>
+            <em>If Test 3 works but this fails, the model struggles with multi-step tool chaining.</em>
         </p>
 
         <div style="margin: 15px 0;">
@@ -133,12 +133,11 @@
     <section class="interpretation-guide">
         <h3>📋 Interpretation Guide</h3>
         <ul>
-            <li><strong>All tests succeed:</strong> PydanticAI and tools work! Full repair likely needs more context/compute or has prompt issues.</li>
-            <li><strong>Tests 1-2 work, Test 3 fails:</strong> Issue is with tool registration or tool execution in repair context.</li>
-            <li><strong>Test 3 shows 0 tools, Test 4 works:</strong> Ollama doesn't support function calling. Use Test 4's manual orchestration approach.</li>
-            <li><strong>Test 3 works, full repair fails:</strong> Context window too small (need 8192+ tokens) or prompt too complex.</li>
-            <li><strong>Test 1 hangs, Test 2 works:</strong> PydanticAI has a deadlock. Check library version or async configuration.</li>
-            <li><strong>All tests hang/fail:</strong> Ollama model is stuck or not responding. Check ollama-model-a/b container logs.</li>
+            <li><strong>All tests succeed:</strong> Agent, tools, and Ollama are working correctly.</li>
+            <li><strong>Test 2 works, Test 1 fails:</strong> Issue is in the LangChain agent setup, not Ollama connectivity.</li>
+            <li><strong>Tests 1-2 work, Test 3 fails:</strong> Issue is with tool registration or MCP server connectivity.</li>
+            <li><strong>Test 3 works, Test 4 fails:</strong> Model struggles with multi-step ReAct reasoning. Try a different model or simplify prompts.</li>
+            <li><strong>All tests hang/fail:</strong> Ollama is not reachable. Verify it's running and accessible from Docker containers.</li>
         </ul>
     </section>
 </div>

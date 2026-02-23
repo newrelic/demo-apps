@@ -27,6 +27,10 @@ OLLAMA_MODEL_B_URL = os.getenv("OLLAMA_MODEL_B_URL", "http://ollama-model-b:1143
 MODEL_A_NAME = os.getenv("MODEL_A_NAME", "mistral:7b-instruct")
 MODEL_B_NAME = os.getenv("MODEL_B_NAME", "ministral-3:8b-instruct-2512-q8_0")
 
+# Agent execution limits (tunable for local vs cloud-hosted models)
+AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS", "10"))
+AGENT_MAX_EXECUTION_TIME = int(os.getenv("AGENT_MAX_EXECUTION_TIME", "300"))
+
 
 class ModelRouter:
     """
@@ -138,8 +142,8 @@ class ModelRouter:
             tools=self.tools,
             callbacks=[nr_callback],
             handle_parsing_errors=True,  # Graceful fallback for parsing errors
-            max_iterations=5,  # Allow up to 5 iterations for complex workflows (detect, diagnose, repair, verify, summarize)
-            max_execution_time=90,  # 90 second timeout (allows 3-4 tool calls @ 20s each)
+            max_iterations=AGENT_MAX_ITERATIONS,
+            max_execution_time=AGENT_MAX_EXECUTION_TIME,
             return_intermediate_steps=True,  # Capture tool execution traces
             verbose=True,  # Detailed logging
             early_stopping_method="force",  # Force stop after max iterations
@@ -147,7 +151,7 @@ class ModelRouter:
 
         logger.info(
             f"Created agent executor for {model_variant}: "
-            f"max_iterations=5, timeout=90s, tools={len(self.tools)}"
+            f"max_iterations={AGENT_MAX_ITERATIONS}, timeout={AGENT_MAX_EXECUTION_TIME}s, tools={len(self.tools)}"
         )
 
         return agent_executor

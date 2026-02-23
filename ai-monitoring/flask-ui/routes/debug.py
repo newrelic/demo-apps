@@ -35,14 +35,15 @@ def test_minimal_agent():
     try:
         agent_client = get_agent_client()
 
-        # Call the debug test endpoint
+        # Call the chat endpoint with a simple message (tests full agent pipeline)
         response = agent_client.session.post(
-            f"{agent_client.base_url}/debug/test",
-            params={"model": model, "message": message},
+            f"{agent_client.base_url}/chat",
+            json={"model": model, "message": message},
             timeout=60
         )
         response.raise_for_status()
         result = response.json()
+        result['success'] = True
 
         logger.info(f"[DEBUG] Test completed - success={result.get('success')}")
         return jsonify(result)
