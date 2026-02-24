@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: locust
-        image: gcr.io/{{PROJECT_ID}}/loadgen:latest
+        image: us-west1-docker.pkg.dev/{{PROJECT_ID}}/demo-apps/loadgen:latest
         env:
         - name: TARGET_HOST
           value: "http://app-{{NUM}}:8080"

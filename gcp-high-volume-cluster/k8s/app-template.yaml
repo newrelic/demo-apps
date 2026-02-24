@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: gcr.io/{{PROJECT_ID}}/hello-world:latest
+        image: us-west1-docker.pkg.dev/{{PROJECT_ID}}/demo-apps/hello-world:latest
         ports:
         - containerPort: 8080
         env:
