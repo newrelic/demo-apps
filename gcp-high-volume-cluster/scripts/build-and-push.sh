@@ -9,19 +9,22 @@ if [ -z "$PROJECT_ID" ]; then
   exit 1
 fi
 
-echo "Building and pushing images to GCR ($REGION)..."
+echo "Building and pushing images to Artifact Registry ($REGION)..."
+echo "NOTE: Building for linux/amd64 platform (GKE nodes)"
 
-# Build single hello world image
+# Build single hello world image for AMD64
 echo "Building hello-world app..."
-docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/demo-apps/hello-world:latest app/
-echo "Pushing hello-world to Artifact Registry..."
-docker push $REGION-docker.pkg.dev/$PROJECT_ID/demo-apps/hello-world:latest
+docker buildx build --platform linux/amd64 \
+  -t $REGION-docker.pkg.dev/$PROJECT_ID/demo-apps/hello-world:latest \
+  --push \
+  app/
 
-# Build loadgen
+# Build loadgen for AMD64
 echo "Building loadgen..."
-docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/demo-apps/loadgen:latest k8s/loadgen/
-echo "Pushing loadgen to Artifact Registry..."
-docker push $REGION-docker.pkg.dev/$PROJECT_ID/demo-apps/loadgen:latest
+docker buildx build --platform linux/amd64 \
+  -t $REGION-docker.pkg.dev/$PROJECT_ID/demo-apps/loadgen:latest \
+  --push \
+  k8s/loadgen/
 
 echo "Done! Images pushed to Artifact Registry:"
 echo "  - $REGION-docker.pkg.dev/$PROJECT_ID/demo-apps/hello-world:latest"

@@ -33,6 +33,10 @@ kubectl create secret generic newrelic-license \
   -n prod \
   --dry-run=client -o yaml | kubectl apply -f -
 
+# Deploy APM Instrumentation resource (required for auto-attach)
+echo "Deploying APM Instrumentation resource..."
+kubectl apply -f k8s/instrumentation.yaml
+
 # Deploy apps and loadgens
 echo "Deploying applications..."
 kubectl apply -f k8s/apps.yaml
@@ -41,11 +45,20 @@ echo "Deploying load generators..."
 kubectl apply -f k8s/loadgens.yaml
 
 echo ""
+echo "Waiting for pods to be ready..."
+kubectl wait --for=condition=ready pod -l app -n prod --timeout=300s || true
+
+echo ""
 echo "Deployment complete!"
+echo ""
+echo "Check New Relic account for:"
+echo "  - Cluster: gcp-high-volume-cluster"
+echo "  - APM: GCP High Volume - Java Apps"
 echo ""
 echo "To check status:"
 echo "  kubectl get pods -n prod"
 echo "  kubectl get pods -n newrelic"
+echo "  kubectl get instrumentation -n prod"
 echo ""
 echo "To scale traffic for an app:"
 echo "  ./scripts/scale-traffic.sh <app-number> <users>"

@@ -63,42 +63,32 @@ app-3 (5 replicas) ← loadgen-3 (50 users)  ← LOW TRAFFIC
 ```
 gcp-high-volume-cluster/
 ├── README.md                    # This file
-├── apps/                        # Java microservices source code
-│   ├── api-gateway/
-│   ├── user-service/
-│   ├── order-service/
-│   ├── payment-service/
-│   ├── inventory-service/
-│   ├── notification-service/
-│   ├── analytics-service/
-│   ├── search-service/
-│   ├── recommendation-service/
-│   ├── reporting-service/
-│   ├── audit-service/
-│   └── health-check-service/
+├── app/                         # Java hello world app
+│   ├── HelloWorld.java          # Simple HTTP server
+│   ├── pom.xml                  # Maven config (minimal)
+│   └── Dockerfile               # Multi-stage build
 ├── k8s/                         # Kubernetes manifests
-│   ├── base/                    # Base configs (Kustomize)
-│   ├── overlays/
-│   │   ├── dev/
-│   │   ├── staging/
-│   │   └── prod/
-│   └── nri-bundle/              # New Relic instrumentation
+│   ├── namespace.yaml           # prod namespace
+│   ├── nri-bundle-values.yaml   # New Relic instrumentation
+│   ├── instrumentation.yaml     # APM auto-attach configuration
+│   ├── app-template.yaml        # Template for app deployments
+│   ├── apps.yaml                # Generated: N app deployments
+│   ├── loadgen-template.yaml    # Template for loadgen deployments
+│   ├── loadgens.yaml            # Generated: N loadgen deployments
+│   └── loadgen/                 # Locust load generator
+│       ├── locustfile.py        # Simple GET /hello script
+│       ├── Dockerfile           # Python + Locust
+│       └── requirements.txt     # Python dependencies
 ├── terraform/                   # GCP infrastructure as code
-│   ├── gke-cluster.tf
-│   ├── networking.tf
-│   └── variables.tf
-├── scripts/                     # Automation scripts
-│   ├── build-and-push.sh        # Build & push all images to GCR
-│   ├── create-namespace.sh      # Create new environment namespace
-│   ├── deploy.sh                # Deploy to specific environment
-│   └── scale.sh                 # Scale deployments
-├── load-testing/                # Traffic generation
-│   ├── locustfile.py            # Locust load test scenarios
-│   └── synthetic-scripts/       # New Relic synthetic monitors
-└── docs/                        # Documentation
-    ├── deployment.md
-    ├── monitoring.md
-    └── troubleshooting.md
+│   ├── main.tf                  # GKE cluster definition
+│   ├── variables.tf             # Terraform variables
+│   └── terraform.tfvars.example # Example config
+└── scripts/                     # Automation scripts
+    ├── build-and-push.sh        # Build & push images to Artifact Registry
+    ├── generate-apps.sh         # Generate N app deployments
+    ├── generate-loadgens.sh     # Generate N loadgen deployments
+    ├── scale-traffic.sh         # Scale traffic for specific app
+    └── deploy-all.sh            # Deploy everything
 ```
 
 ## Implementation Plan
@@ -172,8 +162,8 @@ source .env
 gcloud auth login
 gcloud config set project $GCP_PROJECT_ID
 
-# Configure Docker for GCR
-gcloud auth configure-docker gcr.io
+# Configure Docker for Artifact Registry
+gcloud auth configure-docker us-west1-docker.pkg.dev
 ```
 
 ### 2. Create GKE Cluster
@@ -237,14 +227,28 @@ kubectl get pods -n prod
 
 ### 4. Build and Push Images
 
+**IMPORTANT:** Images must be built for AMD64 architecture (GKE nodes), not ARM64/Mac.
+
 ```bash
 cd ..
-./scripts/build-and-push.sh
+
+# Build for AMD64 platform and push to Artifact Registry
+docker buildx build --platform linux/amd64 \
+  -t us-west1-docker.pkg.dev/$GCP_PROJECT_ID/demo-apps/hello-world:latest \
+  --push \
+  app/
+
+docker buildx build --platform linux/amd64 \
+  -t us-west1-docker.pkg.dev/$GCP_PROJECT_ID/demo-apps/loadgen:latest \
+  --push \
+  k8s/loadgen/
 ```
 
 This builds and pushes:
-- `gcr.io/PROJECT_ID/hello-world:latest` - Java app
-- `gcr.io/PROJECT_ID/loadgen:latest` - Locust load generator
+- `us-west1-docker.pkg.dev/PROJECT_ID/demo-apps/hello-world:latest` - Java app
+- `us-west1-docker.pkg.dev/PROJECT_ID/demo-apps/loadgen:latest` - Locust load generator
+
+**Note:** If building from an ARM64 Mac, you MUST use `docker buildx build --platform linux/amd64` or the images won't run on GKE nodes.
 
 ### 4. Deploy Everything
 
@@ -266,6 +270,12 @@ kubectl get pods -n prod
 
 # Check New Relic pods
 kubectl get pods -n newrelic
+
+# Verify APM auto-attach is configured
+kubectl get instrumentation -n prod
+
+# Check if agent was injected (should show init container)
+kubectl get pod <pod-name> -n prod -o jsonpath='{.spec.initContainers[*].name}'
 
 # View logs from an app
 kubectl logs -n prod -l app=app-1 -f
@@ -378,7 +388,100 @@ To generate more telemetry data:
 
 ## Troubleshooting
 
-See [docs/troubleshooting.md](docs/troubleshooting.md) for common issues and solutions.
+### Common Issues
+
+**1. ImagePullBackOff: "no match for platform in manifest"**
+
+This means the image was built for the wrong CPU architecture (ARM64 instead of AMD64).
+
+**Solution:** Rebuild images with `--platform linux/amd64`:
+```bash
+docker buildx build --platform linux/amd64 \
+  -t us-west1-docker.pkg.dev/$GCP_PROJECT_ID/demo-apps/hello-world:latest \
+  --push \
+  app/
+```
+
+**2. ImagePullBackOff: "403 Forbidden" or permission denied**
+
+GKE nodes don't have permission to pull from Artifact Registry.
+
+**Solution:** Grant the node service account access:
+```bash
+PROJECT_ID=$(gcloud config get-value project)
+NODE_SA=$(gcloud iam service-accounts list --filter="displayName:'Compute Engine default service account'" --format='value(email)')
+
+gcloud artifacts repositories add-iam-policy-binding demo-apps \
+  --location=us-west1 \
+  --member="serviceAccount:$NODE_SA" \
+  --role="roles/artifactregistry.reader"
+```
+
+**3. Pods stuck in CrashLoopBackOff: "ClassNotFoundException: HelloWorld"**
+
+The Java app wasn't compiled correctly in the Docker image.
+
+**Solution:** Verify Dockerfile uses this simple approach:
+```dockerfile
+FROM eclipse-temurin:17-jdk
+WORKDIR /app
+COPY HelloWorld.java ./
+RUN javac HelloWorld.java
+EXPOSE 8080
+ENTRYPOINT ["java", "HelloWorld"]
+```
+
+**4. kubectl connection issues from local machine**
+
+Corporate firewall (like Cloudflare Gateway) may block GKE API access.
+
+**Solution:** Use GCP Cloud Shell instead:
+```bash
+# In Cloud Shell
+gcloud container clusters get-credentials gcp-high-volume-cluster --region us-west1
+kubectl get pods -n prod
+```
+
+**5. nri-bundle helm upgrade fails with webhook conflict**
+
+The k8s-agent-operator webhook has a conflict with existing cert manager.
+
+**Solution:** Delete the conflicting webhook first:
+```bash
+kubectl delete mutatingwebhookconfiguration nri-bundle-nri-metadata-injection
+helm upgrade nri-bundle newrelic/nri-bundle \
+  --namespace newrelic \
+  -f k8s/nri-bundle-values.yaml \
+  --set global.licenseKey=$NEW_RELIC_LICENSE_KEY
+```
+
+**6. APM data not showing in New Relic (infrastructure only)**
+
+The annotation `instrumentation.newrelic.com/inject-java: "true"` is present but no APM data flows.
+
+**Root cause:** The k8s-agents-operator requires an `Instrumentation` CRD to know how to inject the agent.
+
+**Solution:** Create the Instrumentation resource:
+```bash
+kubectl apply -f k8s/instrumentation.yaml
+
+# Create the secret if not exists
+kubectl create secret generic newrelic-license \
+  --from-literal=license-key=$NEW_RELIC_LICENSE_KEY \
+  -n prod
+
+# Delete pods to trigger re-injection with agent
+kubectl delete pods -n prod --all
+```
+
+**Verify auto-attach worked:**
+```bash
+# Should show "newrelic-instrumentation"
+kubectl get instrumentation -n prod
+
+# Should show "newrelic-agent" init container
+kubectl get pod <pod-name> -n prod -o jsonpath='{.spec.initContainers[*].name}'
+```
 
 ## Contributing
 
