@@ -188,12 +188,54 @@ cp terraform.tfvars.example terraform.tfvars
 # Create cluster
 terraform init
 terraform apply
-
-# Get cluster credentials
-gcloud container clusters get-credentials gcp-high-volume-cluster --region us-west1
 ```
 
-### 3. Build and Push Images
+### 3. Configure kubectl Access
+
+**One-time shell setup:**
+
+Add Google Cloud SDK to your shell profile:
+
+```bash
+cat >> ~/.zshrc << 'EOF'
+
+# Google Cloud SDK
+export PATH="/opt/homebrew/share/google-cloud-sdk/bin:$PATH"
+export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
+# Optional: Enable shell completion
+if [ -f '/opt/homebrew/share/google-cloud-sdk/completion.zsh.inc' ]; then
+  source '/opt/homebrew/share/google-cloud-sdk/completion.zsh.inc'
+fi
+if [ -f '/opt/homebrew/share/google-cloud-sdk/path.zsh.inc' ]; then
+  source '/opt/homebrew/share/google-cloud-sdk/path.zsh.inc'
+fi
+EOF
+
+# Reload your shell
+source ~/.zshrc
+```
+
+**Connect to cluster:**
+
+```bash
+# Authenticate with service account (run from project root)
+gcloud auth activate-service-account \
+  YOUR_SERVICE_ACCOUNT@YOUR_PROJECT_ID.iam.gserviceaccount.com \
+  --key-file=./service-account-key.json \
+  --project=YOUR_PROJECT_ID
+
+# Get cluster credentials
+gcloud container clusters get-credentials gcp-high-volume-cluster \
+  --region us-west1 \
+  --project=YOUR_PROJECT_ID
+
+# Test connection
+kubectl get nodes
+kubectl get pods -n prod
+```
+
+### 4. Build and Push Images
 
 ```bash
 cd ..
