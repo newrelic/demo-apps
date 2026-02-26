@@ -6,12 +6,15 @@
 
 A scalable GKE deployment with a simple Java "Hello World" application deployed multiple times with independent load generators. Each app instance is instrumented with New Relic via nri-bundle's auto-attach APM.
 
+**All MELT data is routed through New Relic Pipeline Control Gateway for centralized filtering and cost control.**
+
 ### Goals
 - **Volume:** Generate 2+ GB of telemetry data per day to New Relic
 - **Scale:** Demonstrate production-level traffic patterns
 - **Simplicity:** Single hello world Java app, duplicated N times for volume
 - **Flexibility:** Independent traffic control per app instance via dedicated Locust load generators
 - **Instrumentation:** Zero-code New Relic APM via k8s-agent-operator auto-attach
+- **Cost Control:** Pipeline Control Gateway filters unwanted data before sending to New Relic
 
 ## Architecture
 
@@ -50,9 +53,12 @@ app-3 (5 replicas) ← loadgen-3 (50 users)  ← LOW TRAFFIC
   - `dev` - Development environment
   - `staging` - Staging environment
   - `prod` - Production environment (highest load)
+  - `newrelic` - New Relic monitoring components
 - **Instrumentation:**
-  - **Infrastructure:** nri-bundle (DaemonSet for K8s metrics)
-  - **APM:** nri-bundle auto-attach (automatic Java agent injection)
+  - **Infrastructure:** nri-bundle (DaemonSet for K8s metrics) → Gateway
+  - **APM:** nri-bundle auto-attach (automatic Java agent injection) → Gateway (OTLP)
+  - **Logging:** nri-bundle logging → Gateway
+  - **Gateway:** Pipeline Control Gateway v2.0.0 (6 replicas, filters data before New Relic)
 - **Scaling:**
   - Horizontal Pod Autoscaler (HPA) based on CPU/memory
   - Configurable min/max replicas per service
@@ -88,7 +94,9 @@ gcp-high-volume-cluster/
     ├── generate-apps.sh         # Generate N app deployments
     ├── generate-loadgens.sh     # Generate N loadgen deployments
     ├── scale-traffic.sh         # Scale traffic for specific app
-    └── deploy-all.sh            # Deploy everything
+    ├── deploy-all.sh            # Deploy everything
+    ├── update-gateway-filter.sh # Update gateway drop rules
+    └── verify-gateway-integration.sh # Verify gateway integration
 ```
 
 ## Implementation Plan
@@ -265,10 +273,15 @@ This will:
 ### 5. Verify Deployment
 
 ```bash
+# Run the verification script
+./scripts/verify-gateway-integration.sh
+
+# Or manually check:
+
 # Check app pods
 kubectl get pods -n prod
 
-# Check New Relic pods
+# Check New Relic pods (including gateway)
 kubectl get pods -n newrelic
 
 # Verify APM auto-attach is configured

@@ -2,18 +2,35 @@ global:
   licenseKey: ${NEW_RELIC_LICENSE_KEY}
   cluster: gcp-high-volume-cluster
 
+  # Route through pipeline control gateway
+  # Reference: https://docs.newrelic.com/docs/new-relic-control/pipeline-control/gateway/overview/
+  customAttributes:
+    clusterName: gcp-high-volume-cluster
+    environment: prod
+
+# Infrastructure monitoring - route through gateway
 newrelic-infrastructure:
   enabled: true
   privileged: true
+  config:
+    # Gateway endpoints for New Relic proprietary protocol (port 80)
+    collector_url: "http://pipeline-control-gateway.newrelic.svc.cluster.local:80/v1/data"
+    identity_url: "http://pipeline-control-gateway.newrelic.svc.cluster.local:80/identity/v1"
 
+# Kube State Metrics
 ksm:
   enabled: true
 
+# Kubernetes Events
 kubeEvents:
   enabled: true
 
+# k8s-agents-operator (manages Instrumentation CRDs)
 k8s-agents-operator:
   enabled: true
 
+# Logging - route through gateway
 newrelic-logging:
   enabled: true
+  # Note: Do NOT include API path - the agent will append it
+  endpoint: "http://pipeline-control-gateway.newrelic.svc.cluster.local:80"

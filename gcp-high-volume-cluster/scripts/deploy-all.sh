@@ -37,6 +37,13 @@ kubectl create secret generic newrelic-license \
 echo "Deploying APM Instrumentation resource..."
 kubectl apply -f k8s/instrumentation.yaml
 
+# Wait for k8s-agent-operator to be ready
+echo "Waiting for k8s-agent-operator to be ready..."
+kubectl wait --for=condition=ready pod \
+  -l app.kubernetes.io/name=k8s-agents-operator \
+  -n newrelic \
+  --timeout=120s || echo "Warning: k8s-agent-operator not ready yet"
+
 # Deploy apps and loadgens
 echo "Deploying applications..."
 kubectl apply -f k8s/apps.yaml

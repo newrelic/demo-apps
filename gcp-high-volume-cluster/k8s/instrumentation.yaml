@@ -1,18 +1,31 @@
-apiVersion: newrelic.com/v1alpha1
+apiVersion: newrelic.com/v1alpha2
 kind: Instrumentation
 metadata:
   name: newrelic-instrumentation
-  namespace: prod
+  namespace: newrelic
 spec:
-  java:
+  agent:
+    language: java
+    # New Relic Java agent (latest version with HTTPS support)
     image: newrelic/newrelic-java-init:latest
     env:
+      # Service identification
       - name: NEW_RELIC_APP_NAME
-        value: "GCP High Volume - Java Apps"
-      - name: NEW_RELIC_LICENSE_KEY
-        valueFrom:
-          secretKeyRef:
-            name: newrelic-license
-            key: license-key
+        value: "GCP High Volume - App"
       - name: NEW_RELIC_LABELS
         value: "environment:prod;cluster:gcp-high-volume-cluster"
+
+      # Route through pipeline control gateway (HTTPS on port 443)
+      - name: NEW_RELIC_HOST
+        value: "pipeline-control-gateway.newrelic.svc.cluster.local"
+      - name: NEW_RELIC_PORT
+        value: "443"
+
+      # Path to CA certificate (requires manual volume mount in deployment)
+      - name: NEW_RELIC_CA_BUNDLE_PATH
+        value: "/etc/ssl/certs/gateway-ca.crt"
+
+  licenseKeySecret: newrelic-license
+
+  resource:
+    addK8sUIDAttributes: true
