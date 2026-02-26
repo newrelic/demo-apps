@@ -10,12 +10,13 @@ public class HelloWorld {
     private static final Logger logger = Logger.getLogger(HelloWorld.class.getName());
     private static final Random random = new Random();
 
-    private static final String[] ERROR_MESSAGES = {
-        "Database connection timeout - unable to retrieve user data",
-        "External API rate limit exceeded - request throttled",
-        "Cache miss - failed to retrieve cached session data",
-        "Authentication service unavailable - token validation failed",
-        "Downstream service timeout - payment gateway not responding"
+    private static final String[][] ERROR_MESSAGES = {
+        // {message, severity}
+        {"Database connection timeout - unable to retrieve user data", "ERROR"},
+        {"External API rate limit exceeded - request throttled", "ERROR"},
+        {"Cache miss - failed to retrieve cached session data", "WARNING"},
+        {"Authentication service unavailable - token validation failed", "ERROR"},
+        {"Downstream service timeout - payment gateway not responding", "ERROR"}
     };
 
     public static void main(String[] args) throws IOException {
@@ -33,10 +34,15 @@ public class HelloWorld {
             try {
                 // Randomly trigger errors based on error rate
                 if (random.nextDouble() < errorRate) {
-                    String errorMessage = ERROR_MESSAGES[random.nextInt(ERROR_MESSAGES.length)];
+                    String[] errorData = ERROR_MESSAGES[random.nextInt(ERROR_MESSAGES.length)];
+                    String errorMessage = errorData[0];
+                    String severity = errorData[1];
+
+                    // Map severity to Java logging level
+                    Level logLevel = severity.equals("WARNING") ? Level.WARNING : Level.SEVERE;
 
                     // Log error with structured information
-                    logger.log(Level.SEVERE, String.format(
+                    logger.log(logLevel, String.format(
                         "Request failed: service=%s, error=%s, path=%s, method=%s",
                         serviceName, errorMessage, exchange.getRequestURI(), exchange.getRequestMethod()
                     ));
