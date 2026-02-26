@@ -23,6 +23,8 @@ spec:
         env:
         - name: SERVICE_NAME
           value: "app-{{NUM}}"
+        - name: ERROR_RATE
+          value: "0.10"
         - name: NEW_RELIC_APP_NAME
           value: "GCP High Volume - App {{NUM}}"
         - name: NEW_RELIC_LICENSE_KEY
