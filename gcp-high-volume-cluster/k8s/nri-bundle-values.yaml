@@ -37,3 +37,4 @@ k8s-agents-operator:
 # Alternative: Use OTLP or configure gateway to listen on HTTP
 newrelic-logging:
   enabled: false
+  # endpoint: "http://pipeline-control-gateway.newrelic.svc.cluster.local:80"

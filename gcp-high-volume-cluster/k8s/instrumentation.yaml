@@ -21,11 +21,20 @@ spec:
       - name: NEW_RELIC_PORT
         value: "443"
 
-      # Path to CA certificate (requires manual volume mount in deployment)
+      # Path to CA certificate for TLS validation
       - name: NEW_RELIC_CA_BUNDLE_PATH
         value: "/etc/ssl/certs/gateway-ca.crt"
 
+      # Proxy scheme for gateway connection
+      - name: NEW_RELIC_PROXY_SCHEME
+        value: "https"
+
   licenseKeySecret: newrelic-license
+
+  # Only instrument pods in the prod namespace
+  namespaceLabelSelector:
+    matchLabels:
+      name: prod
 
   resource:
     addK8sUIDAttributes: true
