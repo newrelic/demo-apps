@@ -13,9 +13,11 @@ newrelic-infrastructure:
   enabled: true
   privileged: true
   config:
-    # Gateway endpoints for New Relic proprietary protocol (port 80)
-    collector_url: "http://pipeline-control-gateway.newrelic.svc.cluster.local:80/v1/data"
-    identity_url: "http://pipeline-control-gateway.newrelic.svc.cluster.local:80/identity/v1"
+    # Gateway endpoints for New Relic proprietary protocol (HTTP - gateway doesn't expose port 80)
+    # Note: Gateway only listens on HTTPS 443, not HTTP 80
+    collector_url: "https://pipeline-control-gateway.newrelic.svc.cluster.local:443/v1/data"
+    identity_url: "https://pipeline-control-gateway.newrelic.svc.cluster.local:443/identity/v1"
+    proxy_validate_certificates: false
 
 # Kube State Metrics
 ksm:
@@ -30,7 +32,8 @@ k8s-agents-operator:
   enabled: true
 
 # Logging - route through gateway
+# DISABLED: Gateway only listens on HTTPS 443 with self-signed cert
+# FluentBit's newrelic output plugin can't disable TLS verification
+# Alternative: Use OTLP or configure gateway to listen on HTTP
 newrelic-logging:
-  enabled: true
-  # Note: Do NOT include API path - the agent will append it
-  endpoint: "http://pipeline-control-gateway.newrelic.svc.cluster.local:80"
+  enabled: false
