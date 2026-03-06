@@ -1,0 +1,29 @@
+global:
+  cluster: gcp-high-volume-cluster
+  licenseKey: 392d01b4d0611922830cd179c4662b7cFFFFNRAL
+
+agentControlDeployment:
+  chartValues:
+    subAgentsNamespace: newrelic
+    systemIdentity:
+      parentIdentity:
+        clientId: 384f3326-e68d-4b15-81e7-4a4ed203144f
+        # identityClientSecret has a TTL of 12h
+        clientSecret: wqVAzAEG/5HnCnuzY7qkOAF5d0dT2VSY
+      organizationId: 5e1ae959-709c-48f6-9b54-8863939669b7
+    config:
+      fleet_control:
+        fleet_id: NDgyMDY3MnxOR0VQfEZMRUVUfDAxOWM0ZWUwLTMwNTUtNzcxMC1iMmVlLTk2NjNhYjRjYjVkZg
+      agents:
+        nr-infra:
+          agent_type: newrelic/com.newrelic.infrastructure:0.1.0
+        pipeline-control-gateway:
+          agent_type: newrelic/com.newrelic.pipeline_control_gateway:0.1.0
+    agentsConfig:
+      nr-infra:
+        chart_version: "5.0.109"
+      pipeline-control-gateway:
+        chart_version: "2.0.1"
+        chart_values:
+          global:
+            region: us

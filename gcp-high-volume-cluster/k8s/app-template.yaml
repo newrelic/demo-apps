@@ -24,14 +24,14 @@ spec:
         - |
           cp $JAVA_HOME/lib/security/cacerts /truststore/cacerts
           chmod 644 /truststore/cacerts
-          keytool -import -trustcacerts -alias gateway-ca \
-            -file /etc/ssl/certs/gateway-ca.crt \
+          keytool -import -trustcacerts -alias nginx-gateway-ca \
+            -file /etc/ssl/certs/nginx-ca.crt \
             -keystore /truststore/cacerts \
             -storepass changeit -noprompt
-          echo "CA certificate imported successfully"
+          echo "NGINX CA certificate imported successfully"
         volumeMounts:
-        - name: gateway-ca
-          mountPath: /etc/ssl/certs/gateway-ca.crt
+        - name: nginx-ca
+          mountPath: /etc/ssl/certs/nginx-ca.crt
           subPath: ca.crt
           readOnly: true
         - name: truststore
@@ -66,12 +66,16 @@ spec:
         - name: truststore
           mountPath: /truststore
           readOnly: true
+        - name: nginx-ca
+          mountPath: /etc/ssl/certs/nginx-ca.crt
+          subPath: ca.crt
+          readOnly: true
       volumes:
       - name: truststore
         emptyDir: {}
-      - name: gateway-ca
+      - name: nginx-ca
         configMap:
-          name: gateway-ca-cert
+          name: nr-gateway-proxy-ca
 ---
 apiVersion: v1
 kind: Service

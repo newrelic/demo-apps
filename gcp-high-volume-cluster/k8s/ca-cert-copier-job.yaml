@@ -1,0 +1,89 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cert-copier
+  namespace: newrelic
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cert-reader
+  namespace: newrelic
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["nginx-proxy-ca-secret"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cert-copier-reader
+  namespace: newrelic
+subjects:
+- kind: ServiceAccount
+  name: cert-copier
+  namespace: newrelic
+roleRef:
+  kind: Role
+  name: cert-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: configmap-manager
+  namespace: prod
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cert-copier-manager
+  namespace: prod
+subjects:
+- kind: ServiceAccount
+  name: cert-copier
+  namespace: newrelic
+roleRef:
+  kind: Role
+  name: configmap-manager
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: copy-nginx-ca-cert
+  namespace: newrelic
+spec:
+  template:
+    spec:
+      serviceAccountName: cert-copier
+      containers:
+      - name: copy-cert
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Wait for certificate to be ready
+          until kubectl get secret nginx-proxy-ca-secret -n newrelic -o jsonpath='{.data.ca\.crt}' > /dev/null 2>&1; do
+            echo "Waiting for nginx-proxy-ca-secret..."
+            sleep 5
+          done
+
+          # Extract CA certificate
+          kubectl get secret nginx-proxy-ca-secret -n newrelic -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/ca.crt
+
+          # Create or update ConfigMap in prod namespace
+          kubectl create configmap nr-gateway-proxy-ca \
+            --from-file=ca.crt=/tmp/ca.crt \
+            -n prod \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "CA certificate copied to prod namespace successfully"
+      restartPolicy: OnFailure

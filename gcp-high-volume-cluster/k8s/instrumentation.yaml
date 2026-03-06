@@ -15,15 +15,15 @@ spec:
       - name: NEW_RELIC_LABELS
         value: "environment:prod;cluster:gcp-high-volume-cluster"
 
-      # Route through pipeline control gateway (HTTPS on port 443)
+      # Route through NGINX TLS proxy (HTTPS on port 443)
       - name: NEW_RELIC_HOST
-        value: "pipeline-control-gateway.newrelic.svc.cluster.local"
+        value: "nr-gateway-proxy.newrelic.svc.cluster.local"
       - name: NEW_RELIC_PORT
         value: "443"
 
       # Path to CA certificate for TLS validation
       - name: NEW_RELIC_CA_BUNDLE_PATH
-        value: "/etc/ssl/certs/gateway-ca.crt"
+        value: "/etc/ssl/certs/nginx-ca.crt"
 
       # Proxy scheme for gateway connection
       - name: NEW_RELIC_PROXY_SCHEME

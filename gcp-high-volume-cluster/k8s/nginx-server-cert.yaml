@@ -1,0 +1,30 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nginx-proxy-tls
+  namespace: newrelic
+spec:
+  secretName: nginx-proxy-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  subject:
+    organizations:
+      - NewRelic
+  commonName: nr-gateway-proxy.newrelic.svc.cluster.local
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - server auth
+  dnsNames:
+    - nr-gateway-proxy.newrelic.svc.cluster.local
+    - nr-gateway-proxy.newrelic.svc
+    - nr-gateway-proxy.newrelic
+    - nr-gateway-proxy
+  issuerRef:
+    name: nginx-proxy-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
