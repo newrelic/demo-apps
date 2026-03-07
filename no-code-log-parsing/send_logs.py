@@ -6,12 +6,13 @@ This script:
 - Loads environment variables from .env file or accepts them as arguments
 - Loads a JSONC template file containing log entries
 - Adds the logtype field to all log entries
-- Sends the logs to the appropriate New Relic Logs API endpoint
+- Streams logs to the appropriate New Relic Logs API endpoint (1 log every 5 seconds)
 
 Usage:
     python send_logs.py
     python send_logs.py --log_file custom_logs.jsonc
     python send_logs.py --license_key YOUR_KEY --environment us_prod
+    python send_logs.py --duration 60
 """
 
 import argparse
@@ -19,6 +20,8 @@ import requests  # type: ignore
 import json
 import sys
 import os
+import math
+import time
 from pathlib import Path
 from dotenv import load_dotenv  # type: ignore
 
@@ -31,13 +34,13 @@ LOG_API_ENDPOINTS = {
 }
 
 
-def send_log_batch(license_key, log_payload_list, endpoint_url):
+def send_single_log(license_key, log_entry, endpoint_url):
     """
-    Sends a batch of log entries to the New Relic Log API.
+    Sends a single log entry to the New Relic Log API.
 
     Args:
         license_key (str): Your New Relic License Key.
-        log_payload_list (list): A list of log entry dictionaries.
+        log_entry (dict): A single log entry dictionary.
         endpoint_url (str): The Log API endpoint URL.
 
     Returns:
@@ -48,27 +51,23 @@ def send_log_batch(license_key, log_payload_list, endpoint_url):
         "Content-Type": "application/json"
     }
 
-    payload_json = json.dumps(log_payload_list)
-
-    print(f"[INFO] Sending batch of {len(log_payload_list)} logs to {endpoint_url}", file=sys.stderr)
-    print(f"[DEBUG] Payload size: {len(payload_json)} bytes", file=sys.stderr)
+    payload_json = json.dumps([log_entry])
 
     try:
         response = requests.post(endpoint_url, headers=headers, data=payload_json, timeout=10)
 
         if response.status_code == 202:
-            print(f"[SUCCESS] Successfully sent batch of {len(log_payload_list)} logs.", file=sys.stderr)
             return True
         else:
-            print(f"[ERROR] Failed to send log batch.", file=sys.stderr)
+            print(f"[ERROR] Failed to send log.", file=sys.stderr)
             print(f"Status Code: {response.status_code}", file=sys.stderr)
             print(f"Response: {response.text}", file=sys.stderr)
             return False
     except requests.exceptions.Timeout:
-        print(f"[ERROR] Request timed out while sending logs.", file=sys.stderr)
+        print(f"[ERROR] Request timed out while sending log.", file=sys.stderr)
         return False
     except requests.exceptions.RequestException as e:
-        print(f"[ERROR] An error occurred while sending the request for log batch.", file=sys.stderr)
+        print(f"[ERROR] An error occurred while sending the request.", file=sys.stderr)
         print(f"Error: {e}", file=sys.stderr)
         return False
 
@@ -102,7 +101,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         description="Send log messages from JSONC templates to the New Relic Log API.",
-        epilog="Example: python send_logs.py --log_file logs.jsonc"
+        epilog="Example: python send_logs.py --log_file logs.jsonc --duration 60"
     )
     parser.add_argument(
         "--log_file",
@@ -122,6 +121,17 @@ def main():
         "--logtype",
         help="Log type identifier to add to all logs (overrides .env)"
     )
+    parser.add_argument(
+        "--duration",
+        type=int,
+        help="Total duration to stream logs in seconds (overrides NR_DURATION_SECONDS in .env)"
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        choices=[1, 5],
+        help="Seconds between each log send (1 or 5, overrides NR_INTERVAL_SECONDS in .env, default: 5)"
+    )
 
     args = parser.parse_args()
 
@@ -129,6 +139,38 @@ def main():
     license_key = args.license_key or os.getenv('NR_LICENSE_KEY')
     environment = args.environment or os.getenv('NR_ENVIRONMENT', 'us_prod')
     logtype = args.logtype or os.getenv('NR_LOGTYPE')
+
+    # Resolve interval from arg or env
+    if args.interval is not None:
+        interval = args.interval
+    else:
+        interval_env = os.getenv('NR_INTERVAL_SECONDS', '5')
+        try:
+            interval = int(interval_env)
+        except ValueError:
+            print(f"[ERROR] NR_INTERVAL_SECONDS must be an integer, got: {interval_env}", file=sys.stderr)
+            sys.exit(1)
+        if interval not in (1, 5):
+            print(f"[ERROR] NR_INTERVAL_SECONDS must be 1 or 5, got: {interval}", file=sys.stderr)
+            sys.exit(1)
+
+    # Resolve duration from arg or env
+    if args.duration is not None:
+        duration = args.duration
+    else:
+        duration_env = os.getenv('NR_DURATION_SECONDS')
+        if not duration_env:
+            print("[ERROR] Duration is required. Provide via --duration or set NR_DURATION_SECONDS in .env", file=sys.stderr)
+            sys.exit(1)
+        try:
+            duration = int(duration_env)
+        except ValueError:
+            print(f"[ERROR] NR_DURATION_SECONDS must be an integer, got: {duration_env}", file=sys.stderr)
+            sys.exit(1)
+
+    if duration <= 0:
+        print(f"[ERROR] Duration must be a positive integer, got: {duration}", file=sys.stderr)
+        sys.exit(1)
 
     # Validate required parameters
     if not license_key:
@@ -195,14 +237,24 @@ def main():
     print(f"[INFO] Adding logtype '{logtype}' to all log entries", file=sys.stderr)
     updated_payload = add_logtype_to_entries(payload, logtype)
 
-    # Send logs
-    print(f"[INFO] Sending logs to New Relic...", file=sys.stderr)
-    if send_log_batch(license_key, updated_payload, endpoint_url):
-        print("\n[SUCCESS] Log sending complete", file=sys.stderr)
-        print(f"[SUCCESS] Sent {len(updated_payload)} log entries from '{log_file}'", file=sys.stderr)
-        sys.exit(0)
-    else:
-        print("\n[ERROR] Log sending failed", file=sys.stderr)
+    # Stream logs
+    total_logs = math.ceil(duration / interval)
+    loops = math.ceil(total_logs / len(updated_payload))
+
+    print(f"[INFO] Duration: {duration}s | Interval: {interval}s | Total logs: {total_logs} | Loops: {loops}", file=sys.stderr)
+
+    log_sequence = (updated_payload * loops)[:total_logs]
+
+    success_count = 0
+    for i, log_entry in enumerate(log_sequence, 1):
+        print(f"[INFO] Sending log {i}/{total_logs}...", file=sys.stderr)
+        if send_single_log(license_key, log_entry, endpoint_url):
+            success_count += 1
+        if i < total_logs:
+            time.sleep(interval)
+
+    print(f"\n[SUCCESS] Streaming complete: {success_count}/{total_logs} logs sent successfully", file=sys.stderr)
+    if success_count < total_logs:
         sys.exit(1)
 
 
