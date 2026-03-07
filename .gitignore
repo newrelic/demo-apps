@@ -135,9 +135,11 @@ log/
 config/*.yaml
 config/*.json
 
-# Terraform state (sensitive, manage remotely)
+# Terraform state and vars (sensitive, manage remotely)
 .terraform*
 terraform.tfstate*
+terraform.tfvars
+*.tfplan
 
 #-------------------------------------------------------------------------------
 # Data Files
@@ -181,5 +183,9 @@ web/handlers/*.zip
 !azure-func-sql/scripts/stored_procedures.sql
 # Custom DB backup
 !azure-mssql/mssql/AdventureWorks_custom.bak
-# Local tfvars file
-azure-mssql/terraform/terraform.tfvars
+
+#-------------------------------------------------------------------------------
+# bad-apples Files
+#-------------------------------------------------------------------------------
+# Database schema (excluded from global *.sql ignore)
+!bad-apples/database/init.sql
