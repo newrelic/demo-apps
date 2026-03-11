@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pipeline-control-gateway-s3-config
+  namespace: newrelic
+data:
+  s3-exporter-config.yaml: |
+    # ============================================================================
+    # S3 Exporter Configuration for Pipeline Control Gateway
+    # ============================================================================
+    # This configuration adds AWS S3 export capability to the gateway.
+    # It should be MERGED with the existing pipeline-control-gateway-config.
+    # ============================================================================
+
+    exporters:
+      # AWS S3 Exporter
+      awss3:
+        s3uploader:
+          region: "${AWS_REGION}"
+          s3_bucket: "${S3_BUCKET}"
+          s3_prefix: "telemetry"
+          compression: "gzip"
+          # Using AWS access keys from aws-s3-credentials secret
+          # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY will be loaded from environment
+        marshaler: "otlp_json"
+
+      # Debug exporter for verification (samples data to logs)
+      debug:
+        verbosity: detailed
+        sampling_initial: 5
+        sampling_thereafter: 200
+
+    processors:
+      # Filter for error traces only (optional - not used in selected pipeline)
+      filter/errors_only:
+        error_mode: ignore
+        traces:
+          span:
+            - 'status.code != 2'  # Only keep ERROR status (2 = UNSET)
+
+    service:
+      pipelines:
+        # ====================================================================
+        # S3 Compliance Pipelines
+        # ====================================================================
+        # These pipelines export data to S3 in parallel with New Relic export
+        # ====================================================================
+
+        # Pipeline 1: Sampled Logs to S3 (10% sampling)
+        logs/s3-compliance:
+          receivers:
+            - nrproprietaryreceiver
+            - otlp/receiver
+          processors:
+            - probabilistic_sampler/Logs  # Reuses existing 10% sampler
+          exporters:
+            - awss3
+            - debug
+
+        # Pipeline 2: All Traces to S3 (100% - full compliance archive)
+        traces/s3-compliance:
+          receivers:
+            - nrproprietaryreceiver
+            - otlp/receiver
+          processors: []  # No additional sampling - 100% traces
+          exporters:
+            - awss3
+            - debug
+
+---
+# ============================================================================
+# MERGE INSTRUCTIONS
+# ============================================================================
+# To add S3 export to your gateway:
+#
+# 1. Export current gateway config:
+#    kubectl get configmap pipeline-control-gateway-config -n newrelic \
+#      -o jsonpath='{.data.deployment-config\.yaml}' > /tmp/gateway-config.yaml
+#
+# 2. Manually edit /tmp/gateway-config.yaml:
+#    - Add the "awss3" and "debug" exporters to the "exporters:" section
+#    - Add the "filter/errors_only" processor to "processors:" section (optional)
+#    - Add "logs/s3-compliance" and "traces/s3-compliance" to "service.pipelines:"
+#
+# 3. Update the ConfigMap:
+#    kubectl create configmap pipeline-control-gateway-config \
+#      --from-file=deployment-config.yaml=/tmp/gateway-config.yaml \
+#      -n newrelic \
+#      --dry-run=client -o yaml | kubectl apply -f -
+#
+# 4. Restart gateway pods:
+#    kubectl rollout restart deployment pipeline-control-gateway -n newrelic
+# ============================================================================

@@ -1,5 +1,6 @@
 global:
-  licenseKey: ${NEW_RELIC_LICENSE_KEY}
+  # License key should be set via helm --set or environment variable
+  # licenseKey: ""
   cluster: gcp-high-volume-cluster
 
   # Route through pipeline control gateway
@@ -13,15 +14,34 @@ newrelic-infrastructure:
   enabled: true
   privileged: true
   config:
-    # Gateway endpoints for New Relic proprietary protocol (HTTP - gateway doesn't expose port 80)
-    # Note: Gateway only listens on HTTPS 443, not HTTP 80
-    collector_url: "https://pipeline-control-gateway.newrelic.svc.cluster.local:443/v1/data"
-    identity_url: "https://pipeline-control-gateway.newrelic.svc.cluster.local:443/identity/v1"
-    proxy_validate_certificates: false
+    # Route through NGINX TLS proxy (like APM agents)
+    collector_url: "https://nr-gateway-proxy.newrelic.svc.cluster.local:443/v1/data"
+    identity_url: "https://nr-gateway-proxy.newrelic.svc.cluster.local:443/identity/v1"
+    proxy_validate_certificates: false  # Disable cert validation (self-signed CA)
+
+  # Mount NGINX CA certificate for TLS validation
+  kubelet:
+    extraVolumes:
+      - name: nginx-ca
+        configMap:
+          name: nginx-gateway-ca
+    extraVolumeMounts:
+      - name: nginx-ca
+        mountPath: /etc/ssl/certs/nginx
+        readOnly: true
 
 # Kube State Metrics
 ksm:
   enabled: true
+  # Mount NGINX CA certificate for TLS validation
+  extraVolumes:
+    - name: nginx-ca
+      configMap:
+        name: nginx-gateway-ca
+  extraVolumeMounts:
+    - name: nginx-ca
+      mountPath: /etc/ssl/certs/nginx
+      readOnly: true
 
 # Kubernetes Events
 kubeEvents:

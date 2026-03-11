@@ -1,6 +1,7 @@
 global:
   cluster: gcp-high-volume-cluster
-  licenseKey: 392d01b4d0611922830cd179c4662b7cFFFFNRAL
+  # License key should be set via helm --set or environment variable
+  # licenseKey: ""
 
 agentControlDeployment:
   chartValues:
@@ -8,8 +9,8 @@ agentControlDeployment:
     systemIdentity:
       parentIdentity:
         clientId: 384f3326-e68d-4b15-81e7-4a4ed203144f
-        # identityClientSecret has a TTL of 12h
-        clientSecret: wqVAzAEG/5HnCnuzY7qkOAF5d0dT2VSY
+        # identityClientSecret has a TTL of 12h - set via helm --set
+        # clientSecret: ""
       organizationId: 5e1ae959-709c-48f6-9b54-8863939669b7
     config:
       fleet_control:

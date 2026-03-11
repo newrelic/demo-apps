@@ -1,0 +1,413 @@
+chart_version: "2.0.1"
+chart_values:
+  global:
+    region: "us"
+  gateway:
+    gateway_version: "2.0.1"
+    # Image override for S3 exporter support
+    image:
+      repository: "newrelic/pipeline-control-gateway"
+      tag: "2.0.1-s3exporter"
+      pullPolicy: "IfNotPresent"
+    autoscaling:
+      minReplicas: 6
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 60
+    configuration:
+      simplified/v1:
+        troubleshooting:
+          proxy: false
+          requestTraceLogs: false
+        steps:
+          receivelogs:
+            description: "Receive logs from OTLP and New Relic proprietary sources"
+            output:
+            - "probabilistic_sampler/Logs"
+          receivemetrics:
+            description: "Receive metrics from OTLP and New Relic proprietary sources"
+            output:
+            - "filter/Metrics"
+          receivetraces:
+            description: "Receive traces from OTLP and New Relic proprietary sources"
+            output:
+            - "probabilistic_sampler/Traces"
+          probabilistic_sampler/Logs:
+            description: "Probabilistic sampling for all logs"
+            config:
+              conditionalSamplingRules:
+              - name: "10% Logs - App 12"
+                description: "10% Logs Sampling on Lower Environment"
+                sampling_percentage: 10.0
+                source_of_randomness: "trace.id"
+                condition: "attributes[\"entity.name\"] == \"GCP High Volume - App 12\""
+              - name: "10% Logs - App 11"
+                description: "10% Logs Sampling on Lower Environment 2"
+                sampling_percentage: 10.0
+                source_of_randomness: "trace.id"
+                condition: "attributes[\"entity.name\"] == \"GCP High Volume - App 11\""
+              - name: "10% Logs - App 10 "
+                description: "10% Logs Sampling on Lower Environment 3"
+                sampling_percentage: 10.0
+                source_of_randomness: "trace.id"
+                condition: "attributes[\"entity.name\"] == \"GCP High Volume - App 10\""
+            output:
+            - "filter/Logs"
+          probabilistic_sampler/Traces:
+            description: "Probabilistic sampling for traces"
+            output:
+            - "filter/Traces"
+          filter/Logs:
+            description: "Apply drop rules and data processing for logs"
+            output:
+            - "transform/Logs"
+          filter/Metrics:
+            description: "Apply drop rules and data processing for metrics"
+            output:
+            - "transform/Metrics"
+          filter/Traces:
+            description: "Apply drop rules and data processing for traces"
+            output:
+            - "transform/Traces"
+          transform/Logs:
+            description: "Transform and process logs"
+            output:
+            - "nrexporter/newrelic"
+          transform/Metrics:
+            description: "Transform and process metrics"
+            output:
+            - "nrexporter/newrelic"
+          transform/Traces:
+            description: "Transform and process traces"
+            output:
+            - "nrexporter/newrelic"
+          nrexporter/newrelic:
+            description: "Export to New Relic"
+    generated:
+      extensions:
+        healthcheckv2:
+          component_health:
+            include_permanent_errors: false
+            recovery_duration: "5m"
+            include_recoverable_errors: true
+          http:
+            endpoint: "0.0.0.0:13133"
+            config:
+              path: "/health/config"
+              enabled: true
+            status:
+              path: "/health/status"
+              enabled: true
+          use_v2: true
+        zpages: {}
+      receivers:
+        prometheus/monitoring:
+          config:
+            scrape_configs:
+            - metric_relabel_configs:
+              - regex: "service_version|service_name|service_instance_id"
+                action: "labeldrop"
+              - regex: "godebug_.*"
+                source_labels:
+                - "__name__"
+                action: "drop"
+              job_name: "pipeline-gateway-monitoring"
+              static_configs:
+              - targets:
+                - "0.0.0.0:8888"
+                labels:
+                  clusterName: "{{ .Values.global.cluster }}"
+                  podName: "${env:MY_POD_NAME}"
+                  serviceName: "pipeline-control-gateway"
+                  version: "{{ .Chart.Version }}"
+              scrape_interval: "10s"
+        otlp/receiver:
+          protocols:
+            http:
+              endpoint: "0.0.0.0:4318"
+            grpc:
+              endpoint: "0.0.0.0:4317"
+        nrproprietaryreceiver:
+          proxy: false
+          enable_runtime_metrics: true
+          server:
+            endpoint: "0.0.0.0:80"
+          nr_host: "collector.newrelic.com"
+          endpoints:
+            infra_event_api_endpoint: "https://infra-api.newrelic.com"
+            log_api_endpoint: "https://log-api.newrelic.com"
+            event_api_endpoint: "https://insights-collector.newrelic.com"
+            traces_endpoint: "https://trace-api.newrelic.com"
+            metrics_endpoint: "https://metric-api.newrelic.com"
+          logfilter:
+            enabled: false
+          enable_default_host: false
+          client:
+            compression: "gzip"
+      processors:
+        transform/Logs: {}
+        probabilistic_sampler/Traces:
+          sampling_percentage: 100.0
+          fail_closed: false
+        transform/Traces: {}
+        filter/Metrics: {}
+        transform/Traces_delete_sampling_priority_fields:
+          trace_statements:
+          - context: "span"
+            statements:
+            - "set(trace_id.string, attributes[\"nr_pcg_trace_id_copy\"])"
+            - "delete_key(attributes, \"nr_pcg_trace_id_copy\")"
+            - "delete_key(attributes, \"nr_pcg_generated_random_trace_id\")"
+        transform/Logs_delete_sampling_priority_fields:
+          log_statements:
+          - context: "log"
+            statements:
+            - "set(trace_id.string, attributes[\"nr_pcg_trace_id_copy\"])"
+            - "delete_key(attributes, \"nr_pcg_trace_id_copy\")"
+            - "delete_key(attributes, \"nr_pcg_generated_random_trace_id\")"
+            - "delete_key(attributes, \"sampling.threshold\")"
+            - "delete_key(attributes, \"sampling.randomness\")"
+            - "delete_key(attributes, \"nr_pcg_sampling_priority\")"
+        transform/Metrics: {}
+        transform/Logs_set_sampling_priority:
+          log_statements:
+          - context: "log"
+            statements:
+            - "set(attributes[\"nr_pcg_sampling_priority\"], 10.0)"
+            conditions:
+            - "attributes[\"entity.name\"] == \"GCP High Volume - App 12\" and attributes[\"sampling_priority\"] == nil"
+          - context: "log"
+            statements:
+            - "set(attributes[\"nr_pcg_trace_id_copy\"], trace_id.string)"
+            - "set(trace_id.string, attributes[\"trace.id\"])"
+            conditions:
+            - "attributes[\"trace.id\"] != nil and attributes[\"entity.name\"] == \"GCP High Volume - App 12\""
+          - context: "log"
+            statements:
+            - "set(attributes[\"nr_pcg_generated_random_trace_id\"], UUID())"
+            - "replace_pattern(attributes[\"nr_pcg_generated_random_trace_id\"], \"-\", \"\")"
+            - "set(trace_id.string, attributes[\"nr_pcg_generated_random_trace_id\"])"
+            conditions:
+            - "attributes[\"trace.id\"] == nil and trace_id.string == \"00000000000000000000000000000000\" and attributes[\"entity.name\"] == \"GCP High Volume - App 12\""
+          - context: "log"
+            statements:
+            - "set(attributes[\"nr_pcg_sampling_priority\"], 10.0)"
+            conditions:
+            - "attributes[\"entity.name\"] == \"GCP High Volume - App 11\" and attributes[\"sampling_priority\"] == nil"
+          - context: "log"
+            statements:
+            - "set(attributes[\"nr_pcg_trace_id_copy\"], trace_id.string)"
+            - "set(trace_id.string, attributes[\"trace.id\"])"
+            conditions:
+            - "attributes[\"trace.id\"] != nil and attributes[\"entity.name\"] == \"GCP High Volume - App 11\""
+          - context: "log"
+            statements:
+            - "set(attributes[\"nr_pcg_generated_random_trace_id\"], UUID())"
+            - "replace_pattern(attributes[\"nr_pcg_generated_random_trace_id\"], \"-\", \"\")"
+            - "set(trace_id.string, attributes[\"nr_pcg_generated_random_trace_id\"])"
+            conditions:
+            - "attributes[\"trace.id\"] == nil and trace_id.string == \"00000000000000000000000000000000\" and attributes[\"entity.name\"] == \"GCP High Volume - App 11\""
+          - context: "log"
+            statements:
+            - "set(attributes[\"nr_pcg_sampling_priority\"], 10.0)"
+            conditions:
+            - "attributes[\"entity.name\"] == \"GCP High Volume - App 10\" and attributes[\"sampling_priority\"] == nil"
+          - context: "log"
+            statements:
+            - "set(attributes[\"nr_pcg_trace_id_copy\"], trace_id.string)"
+            - "set(trace_id.string, attributes[\"trace.id\"])"
+            conditions:
+            - "attributes[\"trace.id\"] != nil and attributes[\"entity.name\"] == \"GCP High Volume - App 10\""
+          - context: "log"
+            statements:
+            - "set(attributes[\"nr_pcg_generated_random_trace_id\"], UUID())"
+            - "replace_pattern(attributes[\"nr_pcg_generated_random_trace_id\"], \"-\", \"\")"
+            - "set(trace_id.string, attributes[\"nr_pcg_generated_random_trace_id\"])"
+            conditions:
+            - "attributes[\"trace.id\"] == nil and trace_id.string == \"00000000000000000000000000000000\" and attributes[\"entity.name\"] == \"GCP High Volume - App 10\""
+        filter/Traces: {}
+        telemetrybytesprocessor/incoming: {}
+        probabilistic_sampler/Logs:
+          sampling_percentage: 100.0
+          fail_closed: false
+          sampling_priority: "nr_pcg_sampling_priority"
+        filter/Logs: {}
+        # Filter to exclude logs with "error" string (for S3)
+        filter/Logs_exclude_errors:
+          error_mode: "ignore"
+          logs:
+            log_record:
+              - 'IsMatch(body.string, "(?i)error")'
+        # Filter to keep only logs with "error" string (for New Relic)
+        filter/Logs_errors_only:
+          error_mode: "ignore"
+          logs:
+            log_record:
+              - 'not IsMatch(body.string, "(?i)error")'
+        telemetrybytesprocessor/outgoing: {}
+        transform/Traces_set_sampling_priority:
+          trace_statements:
+          - context: "span"
+            statements:
+            - "set(attributes[\"nr_pcg_generated_random_trace_id\"], UUID())"
+            - "replace_pattern(attributes[\"nr_pcg_generated_random_trace_id\"], \"-\", \"\")"
+            - "set(trace_id.string, attributes[\"nr_pcg_generated_random_trace_id\"])"
+            conditions:
+            - "attributes[\"nr.traceId\"] == nil and trace_id.string == \"00000000000000000000000000000000\""
+          - context: "span"
+            statements:
+            - "set(attributes[\"nr_pcg_trace_id_copy\"], trace_id.string)"
+            - "set(trace_id.string, attributes[\"nr.traceId\"])"
+            conditions:
+            - "attributes[\"nr.traceId\"] != nil"
+      exporters:
+        nrcollectorexporter:
+          endpoint: "https://otlp.nr-data.net"
+          nr_license_key: "${env:NEW_RELIC_LICENSE_KEY}"
+          sending_queue:
+            enabled: false
+          encoding: "json"
+          compression: "gzip"
+          retry_on_failure:
+            initial_interval: "100ms"
+            max_elapsed_time: "5s"
+            max_interval: "500ms"
+            enabled: true
+          timeout: "10s"
+        otlp/exporter:
+          headers:
+            api-key: "${env:NEW_RELIC_LICENSE_KEY}"
+          endpoint: "https://otlp.nr-data.net:443"
+          sending_queue:
+            enabled: false
+        otlphttp:
+          headers:
+            api-key: "${env:NEW_RELIC_LICENSE_KEY}"
+          endpoint: "https://otlp.nr-data.net"
+          sending_queue:
+            enabled: false
+        # ============================================================
+        # S3 EXPORTER - ADDED FOR COMPLIANCE/ARCHIVAL
+        # ============================================================
+        awss3:
+          s3uploader:
+            region: "${env:AWS_REGION}"
+            s3_bucket: "${env:S3_BUCKET}"
+            s3_prefix: "telemetry"
+            compression: "gzip"
+          marshaler: "otlp_json"
+        # Debug exporter for S3 pipeline verification
+        debug:
+          verbosity: "detailed"
+          sampling_initial: 5
+          sampling_thereafter: 200
+      service:
+        extensions:
+        - "zpages"
+        - "healthcheckv2"
+        pipelines:
+          logs/otlp:
+            receivers:
+            - "otlp/receiver"
+            processors:
+            - "telemetrybytesprocessor/incoming"
+            - "transform/Logs_set_sampling_priority"
+            - "probabilistic_sampler/Logs"
+            - "transform/Logs_delete_sampling_priority_fields"
+            - "filter/Logs"
+            - "transform/Logs"
+            - "telemetrybytesprocessor/outgoing"
+            exporters:
+            - "otlp/exporter"
+          metrics/monitoring:
+            receivers:
+            - "prometheus/monitoring"
+            exporters:
+            - "otlphttp"
+          metrics/nr:
+            receivers:
+            - "nrproprietaryreceiver"
+            processors:
+            - "telemetrybytesprocessor/incoming"
+            - "filter/Metrics"
+            - "transform/Metrics"
+            - "telemetrybytesprocessor/outgoing"
+            exporters:
+            - "nrcollectorexporter"
+          traces/nr:
+            receivers:
+            - "nrproprietaryreceiver"
+            processors:
+            - "telemetrybytesprocessor/incoming"
+            - "transform/Traces_set_sampling_priority"
+            - "probabilistic_sampler/Traces"
+            - "transform/Traces_delete_sampling_priority_fields"
+            - "filter/Traces"
+            - "transform/Traces"
+            - "telemetrybytesprocessor/outgoing"
+            exporters:
+            - "nrcollectorexporter"
+          traces/otlp:
+            receivers:
+            - "otlp/receiver"
+            processors:
+            - "telemetrybytesprocessor/incoming"
+            - "transform/Traces_set_sampling_priority"
+            - "probabilistic_sampler/Traces"
+            - "transform/Traces_delete_sampling_priority_fields"
+            - "filter/Traces"
+            - "transform/Traces"
+            - "telemetrybytesprocessor/outgoing"
+            exporters:
+            - "otlp/exporter"
+          logs/nr:
+            receivers:
+            - "nrproprietaryreceiver"
+            processors:
+            - "telemetrybytesprocessor/incoming"
+            - "transform/Logs_set_sampling_priority"
+            - "probabilistic_sampler/Logs"
+            - "transform/Logs_delete_sampling_priority_fields"
+            - "filter/Logs"
+            - "filter/Logs_errors_only"
+            - "transform/Logs"
+            - "telemetrybytesprocessor/outgoing"
+            exporters:
+            - "nrcollectorexporter"
+          metrics/otlp:
+            receivers:
+            - "otlp/receiver"
+            processors:
+            - "telemetrybytesprocessor/incoming"
+            - "filter/Metrics"
+            - "transform/Metrics"
+            - "telemetrybytesprocessor/outgoing"
+            exporters:
+            - "otlp/exporter"
+          # ============================================================
+          # S3 COMPLIANCE PIPELINES - ADDED FOR ARCHIVAL
+          # ============================================================
+          # Exports sampled logs to S3 (10% via existing sampler, excluding logs with "error")
+          logs/s3-compliance:
+            receivers:
+            - "nrproprietaryreceiver"
+            - "otlp/receiver"
+            processors:
+            - "probabilistic_sampler/Logs"
+            - "filter/Logs_exclude_errors"
+            exporters:
+            - "awss3"
+            - "debug"
+          # Exports all traces to S3 (100%)
+          traces/s3-compliance:
+            receivers:
+            - "nrproprietaryreceiver"
+            - "otlp/receiver"
+            processors: []
+            exporters:
+            - "awss3"
+            - "debug"
+        telemetry:
+          traces: {}
+          metrics: {}
+          logs:
+            level: "info"

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-s3-env
+  namespace: newrelic
+data:
+  # AWS Region where your S3 bucket is located
+  AWS_REGION: "us-west-1"
+
+  # S3 bucket name for telemetry storage
+  # IMPORTANT: Change this to your actual bucket name
+  S3_BUCKET: "gcp-high-volume-telemetry"

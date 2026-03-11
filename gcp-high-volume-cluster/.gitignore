@@ -5,6 +5,15 @@
 k8s/apps.yaml
 k8s/loadgens.yaml
 
+# Backup files (may contain sensitive data)
+backups/
+
+# Support logs (may contain sensitive data in URLs)
+support-logs-*.txt
+*-logs-*.txt
+*-LOGS.txt
+HEALTHY-STATUS-LOGS.txt
+
 # Terraform
 terraform/.terraform/
 terraform/*.tfstate
