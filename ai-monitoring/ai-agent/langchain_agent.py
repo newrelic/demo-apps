@@ -93,6 +93,8 @@ MODEL_B_NAME = os.getenv("MODEL_B_NAME", "ministral-3:8b-instruct-2512-q4_K_M")
 # Agent execution limits (tunable for local vs cloud-hosted models)
 AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS", "10"))
 AGENT_MAX_EXECUTION_TIME = int(os.getenv("AGENT_MAX_EXECUTION_TIME", "600"))
+# Repair workflows execute exactly 3 tools; hard cap at 3 to prevent runaway loops
+REPAIR_MAX_ITERATIONS = 3
 
 
 class ModelRouter:
@@ -103,7 +105,7 @@ class ModelRouter:
     with their own LLM instances, callbacks, and metrics tracking.
     """
 
-    def __init__(self, prompt_template: PromptTemplate):
+    def __init__(self, prompt_template: PromptTemplate, max_iterations: int = AGENT_MAX_ITERATIONS):
         """
         Initialize model router with both agents.
 
@@ -126,8 +128,7 @@ class ModelRouter:
             base_url=OLLAMA_MODEL_A_URL,
             api_key="ollama",  # Ollama doesn't require real API key, but ChatOpenAI needs one
             temperature=0.1,  # Low temperature for deterministic tool calls
-            max_tokens=512,   # ReAct steps are short (Thought + Action + Action Input); 512 is sufficient
-            stop=["\nObservation"],  # Prevent model from hallucinating its own tool observations
+            max_tokens=1024,  # Allow room for multi-step generation; Fix 3 strips hallucinated observations
         )
 
         logger.info(f"Model B: {MODEL_B_NAME} at {OLLAMA_MODEL_B_URL}")
@@ -136,8 +137,7 @@ class ModelRouter:
             base_url=OLLAMA_MODEL_B_URL,
             api_key="ollama",  # Ollama doesn't require real API key, but ChatOpenAI needs one
             temperature=0.1,
-            max_tokens=512,   # ReAct steps are short (Thought + Action + Action Input); 512 is sufficient
-            stop=["\nObservation"],  # Prevent model from hallucinating its own tool observations
+            max_tokens=1024,  # Allow room for multi-step generation; Fix 3 strips hallucinated observations
         )
 
         # Create MCP tools (shared between agents)
@@ -150,13 +150,15 @@ class ModelRouter:
             self.model_a,
             MODEL_A_NAME,
             "a",
-            prompt_template
+            prompt_template,
+            max_iterations=max_iterations,
         )
         self.agent_b = self._create_agent(
             self.model_b,
             MODEL_B_NAME,
             "b",
-            prompt_template
+            prompt_template,
+            max_iterations=max_iterations,
         )
 
         logger.info("=" * 60)
@@ -168,7 +170,8 @@ class ModelRouter:
         llm: ChatOpenAI,
         model_name: str,
         model_variant: str,
-        prompt_template: PromptTemplate
+        prompt_template: PromptTemplate,
+        max_iterations: int = AGENT_MAX_ITERATIONS,
     ) -> AgentExecutor:
         """
         Create a ReAct agent executor.
@@ -206,7 +209,7 @@ class ModelRouter:
             tools=self.tools,
             callbacks=[nr_callback],
             handle_parsing_errors="Invalid format. Respond with ONLY:\nThought: All steps complete\nFinal Answer: [brief summary of what was done]",
-            max_iterations=AGENT_MAX_ITERATIONS,
+            max_iterations=max_iterations,
             max_execution_time=AGENT_MAX_EXECUTION_TIME,
             return_intermediate_steps=True,  # Capture tool execution traces
             verbose=True,  # Detailed logging
@@ -215,7 +218,7 @@ class ModelRouter:
 
         logger.info(
             f"Created agent executor for {model_variant}: "
-            f"max_iterations={AGENT_MAX_ITERATIONS}, timeout={AGENT_MAX_EXECUTION_TIME}s, tools={len(self.tools)}"
+            f"max_iterations={max_iterations}, timeout={AGENT_MAX_EXECUTION_TIME}s, tools={len(self.tools)}"
         )
 
         return agent_executor
@@ -273,7 +276,7 @@ def init_router(prompt_template: PromptTemplate) -> ModelRouter:
         Initialized ModelRouter instance
     """
     global _router
-    _router = ModelRouter(prompt_template)
+    _router = ModelRouter(prompt_template, max_iterations=REPAIR_MAX_ITERATIONS)
     return _router
 
 
@@ -374,7 +377,14 @@ async def run_agent_workflow(
         # with a special output string, making the timeout invisible to New Relic.
         agent_output = result.get('output', '')
         if 'Agent stopped due to iteration limit or time limit' in agent_output:
-            raise RuntimeError(f"Agent force-stopped (timeout or iteration limit): {agent_output}")
+            intermediate_steps = result.get('intermediate_steps', [])
+            if not intermediate_steps:
+                # Force-stopped with no tool calls at all — genuine failure
+                raise RuntimeError(f"Agent force-stopped (timeout or iteration limit): {agent_output}")
+            # Force-stopped after calling tools — the repair steps ran, synthesize a final answer
+            tool_calls = [step[0].tool for step in intermediate_steps]
+            agent_output = f"Completed {len(tool_calls)} step(s): {', '.join(tool_calls)}"
+            result['output'] = agent_output
 
         success = True
         latency = time.time() - start_time

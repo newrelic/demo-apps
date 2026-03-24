@@ -67,7 +67,7 @@ def send_workflow():
     success = result.get('success', False)
 
     if success and actions:
-        response_text = f"Workflow completed. Actions taken: {', '.join(actions)}. {final_status}"
+        response_text = f"Workflow completed. Actions taken: {', '.join(actions)}."
     elif not success:
         response_text = f"Workflow failed. {final_status}"
     else:

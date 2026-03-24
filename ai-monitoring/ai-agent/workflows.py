@@ -17,17 +17,12 @@ MINIMAL_SINGLE_TOOL = """Your task: Call system_health ONCE, then immediately pr
 
 STOP after 1 tool call. Do NOT call any other tools. DO NOT verify or check again."""
 
-FORCED_FULL_REPAIR = """Perform a repair workflow using EXACTLY 3 tool calls in this order:
+FORCED_FULL_REPAIR = """Perform a complete repair workflow:
+1. Call system_health to check the system
+2. Call service_restart to restart the api-gateway service (do this regardless of health status)
+3. Call system_health again to verify the system is healthy
 
-1. Call system_health (no arguments)
-2. Call service_restart with service_name="api-gateway" — do this regardless of health status
-3. Call system_health (no arguments) — this is your LAST tool call
-
-After the Observation from tool call 3, output EXACTLY this and nothing else:
-Thought: All steps complete
-Final Answer: Checked system health, restarted api-gateway, verified recovery.
-
-STOP. Do NOT call any more tools after step 3. Do NOT add extra health checks."""
+Execute all 3 steps in order."""
 
 REPAIR_WORKFLOW_DETERMINISTIC = """
 Check system health. If the api-gateway service is degraded or has errors, read its logs

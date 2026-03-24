@@ -9,7 +9,7 @@ import os
 import logging
 import httpx
 from typing import List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from langchain.tools import StructuredTool
 import newrelic.agent
 
@@ -72,15 +72,33 @@ async def call_mcp_tool(tool_path: str, method: str = "GET", data: dict = None) 
 # ===== Tool Input Schemas =====
 
 
+def _normalize_service_name(data):
+    """Accept 'service' as an alias for 'service_name' (weaker models omit the _name suffix)."""
+    if isinstance(data, dict) and 'service_name' not in data and 'service' in data:
+        data = dict(data)
+        data['service_name'] = data.pop('service')
+    return data
+
+
 class ServiceLogsInput(BaseModel):
     """Input schema for service_logs tool."""
     service_name: str = Field(description="Name of the service (e.g., 'api-gateway', 'auth-service')")
     lines: int = Field(default=50, description="Number of log lines to retrieve", ge=1, le=1000)
 
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_service_key(cls, data):
+        return _normalize_service_name(data)
+
 
 class ServiceRestartInput(BaseModel):
     """Input schema for service_restart tool."""
     service_name: str = Field(description="Name of the service to restart")
+
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_service_key(cls, data):
+        return _normalize_service_name(data)
 
 
 class ServiceConfigUpdateInput(BaseModel):
@@ -89,10 +107,20 @@ class ServiceConfigUpdateInput(BaseModel):
     key: str = Field(description="Configuration key to update")
     value: str = Field(description="New configuration value")
 
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_service_key(cls, data):
+        return _normalize_service_name(data)
+
 
 class ServiceDiagnosticsInput(BaseModel):
     """Input schema for service_diagnostics tool."""
     service_name: str = Field(description="Name of the service to diagnose")
+
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_service_key(cls, data):
+        return _normalize_service_name(data)
 
 
 # ===== Tool Functions =====

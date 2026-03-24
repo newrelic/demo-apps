@@ -15,12 +15,11 @@ LANGCHAIN_REPAIR_PROMPT = """You are an AI DevOps engineer for monitoring and re
 
 Tools: {tools}
 
-## CRITICAL RULE: Your FIRST action must ALWAYS be calling system_health
-
 ## Rules
 - Follow the exact steps listed in your task, in order
 - Do NOT skip steps or reorder them
 - Do NOT call tools not listed in your task
+- Execute ONLY the steps in the task — do NOT add extra tool calls based on what you observe
 - After completing ALL steps in your task, output "Final Answer:" immediately — no more tool calls
 
 ## Examples

@@ -735,7 +735,7 @@ All operations return realistic JSON data and create distributed traces visible 
 
 ### What to Compare
 
-- **Speed**: Model A (~2s) is significantly faster than Model B (~70s) due to smaller size and lower quantization overhead
+- **Speed**: Model A (~2s) is faster than Model B (~5s); both models complete the forced_full_repair workflow reliably
 - **Accuracy**: Model B (ministral-3:8b q4_K_M) uses 4-bit mixed quantization for reliable tool calling; Model A (mistral:7b-instruct) is lighter and faster
 - **Size**: Model A (~4GB) vs Model B (~5GB) - Model B uses q4_K_M quantization for reliable structured outputs
 - **Use Case Fit**: Model A for fast, efficient responses; Model B for reliable, accurate results

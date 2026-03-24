@@ -246,7 +246,7 @@ def token_count_callback(model: str, content: Any) -> int:
 
 ### Upstream Services
 - **ollama-model-a** (Port 11434): Mistral 7B Instruct — Efficient & Fast (~2s latency)
-- **ollama-model-b** (Port 11435): Ministral 8B q4_K_M — Reliable & Accurate (~70s latency)
+- **ollama-model-b** (Port 11435): Ministral 8B q4_K_M — Reliable & Accurate (~5s latency)
 - **mcp-server** (Port 8002): Tool interface for system operations
 
 ### Downstream Services
