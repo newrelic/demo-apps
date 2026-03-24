@@ -8,6 +8,7 @@ Provides:
 """
 
 import json
+import re
 import os
 import logging
 from typing import Literal, Dict, Any, List, Union
@@ -22,24 +23,45 @@ from observability import NewRelicCallback, MetricsTracker
 
 logger = logging.getLogger(__name__)
 
+# Known tool names used to recover from multi-step list actions like
+# "Action: 1. system_health 2. service_restart ..."
+_KNOWN_TOOLS = [
+    "system_health", "database_status", "service_restart",
+    "service_logs", "service_config_update", "service_diagnostics",
+]
+
 
 class JSONReActOutputParser(ReActSingleInputOutputParser):
-    """ReAct output parser that JSON-parses Action Input for multi-arg tools.
+    """ReAct output parser that normalises weaker-model output before parsing.
 
-    LangChain's default ReActSingleInputOutputParser returns Action Input as a
-    raw string. When BaseTool._parse_input receives a string, it wraps it as
-    {first_field: string} — which fails pydantic validation for any tool that
-    requires more than one field. This parser JSON-parses the action input when
-    possible so the tool receives a dict and takes the correct validation path.
+    Fixes three common mistral:7b-instruct failure modes:
+    1. Tool name has parentheses:  `Action: system_health()`
+    2. Action is a numbered list:  `Action: 1. system_health 2. service_restart …`
+    3. Action Input has trailing prose after valid JSON:
+       `Action Input: {"service_name": "api-gateway"}. Once restarted …`
     """
 
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
+        # --- Fix 1: strip () from tool names ---
+        text = re.sub(r'^(Action:\s*\w+)\(\)', r'\1', text, flags=re.MULTILINE)
+
+        # --- Fix 2: numbered-list action → first valid tool name ---
+        list_match = re.search(
+            r'^Action:\s*(?:\d+\.\s*)(' + '|'.join(_KNOWN_TOOLS) + r')',
+            text, re.MULTILINE
+        )
+        if list_match:
+            tool = list_match.group(1)
+            text = re.sub(r'^Action:.*$', f'Action: {tool}', text, flags=re.MULTILINE)
+
         result = super().parse(text)
+
+        # --- Fix 3: extract first JSON object from Action Input, drop trailing prose ---
         if isinstance(result, AgentAction) and isinstance(result.tool_input, str):
             stripped = result.tool_input.strip()
             if stripped.startswith("{"):
                 try:
-                    parsed = json.loads(stripped)
+                    parsed, _ = json.JSONDecoder().raw_decode(stripped)
                     return AgentAction(result.tool, parsed, result.log)
                 except json.JSONDecodeError:
                     pass
