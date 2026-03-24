@@ -175,7 +175,7 @@ The agent supports **prompt-guided tool sequences** via workflow parameters:
 | Workflow | Description | Tool Sequence |
 |----------|-------------|---------------|
 | `minimal_single_tool` | Single health check | `system_health` (1 call) |
-| `forced_full_repair` | Complete repair cycle (all 6 tools, 7 calls) | `system_health` → `service_logs` → `service_diagnostics` → `database_status` → `service_config_update` → `service_restart` → `system_health` |
+| `forced_full_repair` | Complete repair cycle (3 steps) | `system_health` → `service_restart` (api-gateway) → `system_health` |
 | `repair_deterministic` | Conditional repair | Health check, diagnose if needed, restart, verify |
 | `repair_open_ended` | LLM-controlled | Agent decides tool sequence based on context |
 

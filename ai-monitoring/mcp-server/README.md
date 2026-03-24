@@ -1,14 +1,16 @@
 # MCP Server - Model Context Protocol Tool Interface
 
-FastMCP server that exposes Docker container management and Locust load testing as tools for the AI agent via the Model Context Protocol.
+FastMCP server that exposes generic system operation tools for the AI agent via the Model Context Protocol. All tools return realistic mock data — no real infrastructure operations are performed.
 
 ## Features
 
-- **Docker Container Management**: List, inspect, restart, and read logs from Docker containers
-- **Environment Variable Updates**: Modify container environment variables dynamically
-- **Locust Integration**: Start, stop, and monitor load tests
+- **System Health Checks**: Report status of all simulated services with dynamic degradation
+- **Service Logs**: Return realistic log entries for any named service
+- **Service Restart**: Simulate restarting a service and mark it as healthy
+- **Database Status**: Return mock connection pool, query performance, and cache metrics
+- **Service Configuration Update**: Accept config key/value changes for a service
+- **Service Diagnostics**: Return multi-point health check results for a service
 - **HTTP API**: RESTful endpoints for all MCP tools
-- **Docker Socket Access**: Direct control of Docker daemon
 - **New Relic Instrumentation**: Full APM monitoring with distributed tracing
 
 ## Architecture
@@ -70,100 +72,52 @@ AI Agent                MCP Server              Docker Socket
 
 ## Tool Reference
 
-### Docker Tools
+All tools return realistic mock data. No real system operations are performed.
 
-#### `docker_container_list()`
-List all Docker containers with their status.
+### `system_health()`
+Check overall system health for all simulated services.
 
-**Returns**:
-```python
-[
-  {
-    "id": "abc123...",
-    "name": "aim-ai-agent",
-    "status": "running",
-    "image": "aim-ai-agent:latest",
-    "ports": {"8001/tcp": [{"HostPort": "8001"}]}
-  },
-  ...
-]
-```
+**Returns**: JSON with service statuses (api-gateway, auth-service, database, cache-service), CPU/memory/disk metrics, and network throughput. api-gateway has a 30% chance of being degraded; it stays healthy for 120 seconds after a `service_restart` call.
 
-#### `docker_logs(service_name: str, lines: int = 100)`
-Read container logs.
+### `service_logs(service_name: str, lines: int = 50)`
+Retrieve recent log entries for a service.
 
 **Parameters**:
-- `service_name`: Container name (e.g., "api-gateway" or "auth-service")
-- `lines`: Number of log lines to return (default: 100)
+- `service_name`: Service name (e.g., `"api-gateway"`, `"auth-service"`)
+- `lines`: Number of lines to return (default: 50)
 
-**Returns**: Log output as string
+**Returns**: Realistic log output as a string with timestamps and log levels.
 
-#### `docker_restart(service_name: str)`
-Restart a container.
-
-**Parameters**:
-- `service_name`: Container name
-
-**Returns**: Success/failure message
-
-#### `docker_inspect(service_name: str)`
-Get detailed container information.
+### `service_restart(service_name: str)`
+Simulate restarting a service. Records restart timestamp so `system_health` shows the service as healthy for the next 120 seconds.
 
 **Parameters**:
-- `service_name`: Container name
+- `service_name`: Service name to restart
 
-**Returns**: Full container configuration (env vars, mounts, network, etc.)
+**Returns**: JSON with new process ID and restart confirmation.
 
-#### `docker_update_env(service_name: str, key: str, value: str)`
-Update environment variable and restart container.
+### `database_status()`
+Check database health and performance metrics.
+
+**Returns**: JSON with connection pool utilization, average query time, slow query count, cache hit rate, and replication lag (simulated PostgreSQL).
+
+### `service_config_update(service_name: str, key: str, value: str)`
+Update a configuration value for a service.
 
 **Parameters**:
-- `service_name`: Container name
-- `key`: Environment variable name
+- `service_name`: Service name
+- `key`: Configuration key
 - `value`: New value
 
-**Returns**: Success/failure message
+**Returns**: JSON confirming the update and indicating whether a restart is required.
 
-**Note**: This stops the container, updates docker-compose.yml, and restarts it.
-
-### Locust Tools
-
-#### `locust_start_test(users: int, spawn_rate: int, duration: int = 0)`
-Start a load test.
+### `service_diagnostics(service_name: str)`
+Run multi-point health checks on a service.
 
 **Parameters**:
-- `users`: Number of concurrent users
-- `spawn_rate`: Users spawned per second
-- `duration`: Test duration in seconds (0 = run until stopped)
+- `service_name`: Service name to diagnose
 
-**Returns**:
-```python
-{
-  "status": "started",
-  "users": 10,
-  "spawn_rate": 2,
-  "duration": 60
-}
-```
-
-#### `locust_get_stats()`
-Get current load test statistics.
-
-**Returns**:
-```python
-{
-  "state": "running",
-  "total_requests": 1234,
-  "total_failures": 5,
-  "requests_per_second": 25.3,
-  "average_response_time": 45.2
-}
-```
-
-#### `locust_stop_test()`
-Stop the currently running load test.
-
-**Returns**: Success message
+**Returns**: JSON with endpoint/database/cache/dependency health checks, resource usage, and recommendations. Has a 10% chance of returning degraded status.
 
 ## HTTP API Endpoints
 

@@ -169,7 +169,7 @@ open http://localhost:8089
 
 **Expected Output**:
 ```
-[LOCUST] Loaded prompt pool: {'total_prompts': 18, ...}
+[LOCUST] Loaded prompt pool: {'total_prompts': 19, ...}
 [LOCUST] on_start: Sending initial request immediately...
 [LOCUST] Sending prompt: simple_chat - Basic greeting (endpoint=/chat)
 [LOCUST] ✓ Model A: simple_chat (chat, 8.2s)

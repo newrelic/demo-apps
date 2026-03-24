@@ -96,9 +96,7 @@ flask-ui/
 - `GET /api/health` - Agent health status (30s poll)
 - `GET /api/containers` - Service status (15s poll)
 - `GET /api/logs/<container>` - Service logs
-- `GET /api/load-test/status` - Load test statistics (5s poll)
-- `POST /api/load-test/start` - Start load test
-- `POST /api/load-test/stop` - Stop load test
+- `GET /api/metrics` - Model metrics (latency, tool counts)
 
 ### Action Routes
 - `POST /tools/trigger` - Trigger tool execution workflow
@@ -269,16 +267,15 @@ Open browser DevTools (F12) → Console tab to verify instrumented logging:
 3. Verify "Browser" section shows data
 
 **View Browser Transactions:**
-- Navigate through all three modes (Repair, Chat, Comparison)
+- Navigate through all three modes (Home, Tools, Chat)
 - Click buttons, submit forms, trigger actions
 - Check New Relic Browser → Page Views
 
 **AJAX Monitoring:**
 Check New Relic Browser → AJAX Requests for polling activity:
 - `/api/health` (30s intervals)
-- `/api/metrics` (10s intervals)
 - `/api/containers` (15s intervals)
-- `/api/load-test/status` (5s intervals)
+- `/api/metrics` (on-demand)
 
 **Browser Script Injection:**
 View page source (View → Page Source) and verify New Relic browser script is injected in `<head>`:
@@ -319,13 +316,6 @@ This confirms automatic WSGI instrumentation is working.
 - [ ] Not linked in any UI navigation
 - [ ] Tool testing interface functional
 
-#### Load Testing
-- [ ] Start load test button triggers test
-- [ ] Status updates every 5 seconds when running
-- [ ] Stop button appears and works when test active
-- [ ] Stats display: total requests, RPS, average response time
-- [ ] Console shows `[LoadTest]` logs with status
-
 ### Performance Metrics
 
 #### Expected Polling Behavior
@@ -333,18 +323,15 @@ This confirms automatic WSGI instrumentation is working.
 | Data | Endpoint | Interval | Log Output |
 |------|----------|----------|------------|
 | Agent health | `/api/health` | 30s | `[Main] Agent status: Online (uptime: Xh Xm)` |
-| Metrics | `/api/metrics` | 10s | `[Comparison] Metrics data: {model_a: {...}, model_b: {...}}` |
-| Containers | `/api/containers` | 15s | `[Repair] Found 8 containers` |
-| Load test | `/api/load-test/status` | 5s | `[LoadTest] Current status: running, Users: X, RPS: X` |
+| Containers | `/api/containers` | 15s | `[Tools] Found 6 containers` |
 
 #### Request Timing
 
 Console logs include performance measurements using `performance.now()`:
 ```
 [APIClient] GET /api/health completed in 45.23ms with status 200
-[APIClient] POST /repair/trigger completed in 2543.67ms with status 200
-[Repair] Repair workflow completed in 2.54s
-[Comparison] Chart update completed in 34.56ms
+[APIClient] POST /tools/trigger completed in 2543.67ms with status 200
+[Tools] Workflow completed in 2.54s
 ```
 
 ### Success Criteria
@@ -369,11 +356,6 @@ curl -s http://localhost:8501 | grep "<title>New Relic AIM Demo</title>"
 - Check Network tab in DevTools
 - See regular requests to `/api/health`, `/api/metrics`, `/api/containers`
 - Status codes should be 200
-
-✅ **Charts rendering:**
-- Navigate to Model Comparison dashboard
-- See two Plotly charts (latency, success rate)
-- Charts should update every 10 seconds
 
 ✅ **Session persistence:**
 - Go to Chat mode
@@ -404,10 +386,8 @@ curl -s http://localhost:8501 | grep "<title>New Relic AIM Demo</title>"
 - Page load times
 - AJAX request performance
 - Container status checks
-- Repair workflow latency
+- Tool execution workflow latency
 - Chat interaction latency
-- Model comparison metrics
-- Load test statistics
 
 ## Development Notes
 
@@ -420,7 +400,6 @@ curl -s http://localhost:8501 | grep "<title>New Relic AIM Demo</title>"
 
 ### JavaScript Architecture
 - `main.js` - Global utilities (APIClient, PollingManager)
-- `load_test.js` - Load testing controls
 - `tools.js` - Tool execution mode functionality
 - `chat.js` - Chat interface
 
@@ -438,7 +417,6 @@ The application includes comprehensive instrumented logging for debugging and mo
 - `[APIClient]` - HTTP requests with timing and response data
 - `[Tools]` - Tool execution mode operations
 - `[Chat]` - Chat mode operations
-- `[LoadTest]` - Load testing controls
 
 ### Example Console Output
 ```
@@ -453,16 +431,14 @@ The application includes comprehensive instrumented logging for debugging and mo
 [Tools] System status polling started (15s interval)
 [Chat] Initializing chat mode
 [Chat] Loaded 5 messages from history
-[LoadTest] Load test controls initialized
 ```
 
 ### Performance Tracking
 All API requests include timing information using `performance.now()`:
 ```
-[APIClient] POST /repair/trigger completed in 2543.67ms with status 200
-[Repair] Repair workflow completed in 2.54s
-[APIClient] GET /api/metrics completed in 123.45ms with status 200
-[Comparison] Chart update completed in 45.67ms
+[APIClient] POST /tools/trigger completed in 2543.67ms with status 200
+[Tools] Workflow completed in 2.54s
+[APIClient] GET /api/health completed in 45.23ms with status 200
 ```
 
 ### Polling Activity
@@ -471,19 +447,13 @@ Expected polling logs for each page:
 # Sidebar (all pages)
 [Main] Agent status: Online (uptime: 2h 15m)  # Every 30s
 
-# Repair Mode
-[Repair] Found 8 containers  # Every 15s
-
-# Comparison Dashboard
-[Comparison] Metrics data: {model_a: {...}, model_b: {...}}  # Every 10s
-
-# Load Test Panel (when running)
-[LoadTest] Current status: running, Users: 10, RPS: 25.3  # Every 5s
+# Tools Mode
+[Tools] Found 6 containers  # Every 15s
 ```
 
 ### Debugging Tips
 1. **Open DevTools**: Press F12 or right-click → Inspect → Console tab
-2. **Filter by Module**: Type `[Repair]` in console filter to see only repair logs
+2. **Filter by Module**: Type `[Tools]` in console filter to see only tools page logs
 3. **Check Timing**: Look for `completed in Xms` to identify slow requests
 4. **Verify Polling**: Confirm you see regular polling logs at expected intervals
 5. **Network Tab**: Check Network tab for failed requests (red status codes)
@@ -550,34 +520,6 @@ docker-compose up -d
 ```
 
 ### Application Issues
-
-#### Charts not rendering
-
-**Symptoms:**
-- Blank dashboard in Model Comparison mode
-- Console error: `[Comparison] Plotly.js not loaded`
-- Charts don't update despite polling logs
-
-**Diagnosis:**
-```javascript
-// In browser console
-typeof Plotly
-// Should return: "object"
-```
-
-**Solutions:**
-```bash
-# Verify Plotly.js exists
-ls -lh flask-ui/static/vendor/plotly-2.27.0.min.js
-
-# Re-download if missing (3.5MB file)
-cd flask-ui/static/vendor
-curl -o plotly-2.27.0.min.js https://cdn.plot.ly/plotly-2.27.0.min.js
-
-# Rebuild container
-docker-compose build --no-cache flask-ui
-docker-compose up -d flask-ui
-```
 
 ### Session not persisting
 

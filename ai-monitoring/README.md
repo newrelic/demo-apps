@@ -182,22 +182,17 @@ http://localhost:8501
    - **Model A (mistral:7b-instruct-v0.3)**: Efficient & Fast (~2s latency)
    - **Model B (ministral-3:8b-instruct-2512-q4_K_M)**: Reliable & Accurate (q4_K_M mixed-precision)
 3. Click "Run Workflow"
-4. Watch the agent execute a full repair cycle using all 6 available MCP tools:
+4. Watch the agent execute a 3-step repair cycle:
    - Call `system_health` to assess current status
-   - Call `service_logs`, `service_diagnostics`, and `database_status` to diagnose
-   - Call `service_config_update` then `service_restart` to remediate
+   - Call `service_restart` to restart api-gateway (regardless of status)
    - Call `system_health` again to verify recovery
 
 **What the Agent Does**:
 
-- Runs a 7-step sequence using all 6 available MCP tools:
+- Runs a 3-step repair cycle:
   1. `system_health` — detect overall system status
-  2. `service_logs` — read api-gateway logs
-  3. `service_diagnostics` — comprehensive api-gateway health check
-  4. `database_status` — verify data layer health
-  5. `service_config_update` — update api-gateway connection pool config (requires restart)
-  6. `service_restart` — restart api-gateway to apply the config change
-  7. `system_health` — verify recovery
+  2. `service_restart` — restart api-gateway (regardless of current status)
+  3. `system_health` — verify recovery
 - First health check may show degraded (30% chance) — the workflow proceeds regardless
 - Final health check confirms recovery (always healthy post-restart for 120s)
 
@@ -568,7 +563,7 @@ docker system df -v | grep aim
 | Component | Size | Can Remove? | Impact |
 |-----------|------|-------------|--------|
 | Ollama Model A image | ~4GB | Yes | Next start requires 4-5 min rebuild |
-| Ollama Model B image | ~8GB | Yes | Next start requires 5-7 min rebuild |
+| Ollama Model B image | ~5GB | Yes | Next start requires 5-7 min rebuild |
 | App service images | ~2GB | Yes | Next start requires 2-min rebuild |
 | Docker volumes | ~500MB | Yes | Loses failure state, model cache |
 | Container logs | ~200-500MB | Yes | Loses log history |
@@ -860,7 +855,7 @@ docker-compose ps
 docker-compose down -v
 ```
 
-For detailed cleanup and disk space management strategies, see the [Cleanup & Disk Space Management](#cleanup--disk-space-management) section below.
+For detailed cleanup and disk space management strategies, see the [Cleanup & Disk Space Management](#cleanup--disk-space-management) section above.
 
 ## 🎓 Learning Resources
 
@@ -877,7 +872,7 @@ For detailed cleanup and disk space management strategies, see the [Cleanup & Di
 ## 🐛 Known Issues
 
 1. **First Build Takes Time**: Initial image build takes 20-30 minutes to build all services (one-time only)
-2. **Memory Usage**: Requires 4-6GB Docker memory allocation minimum (8GB+ recommended)
+2. **Memory Usage**: Requires 12-14GB Docker memory allocation minimum (16GB+ recommended)
 3. **Docker Socket**: Requires privileged access on some systems
 4. **Port Conflicts**: Ensure ports 8000, 8001, 8002, 8089, 8501, 11434, 11435 are available
 5. **Model "signal: killed"**: If you see this error, your Docker memory is too low - see [Troubleshooting](#-troubleshooting)
