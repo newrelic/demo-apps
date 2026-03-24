@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add initial log
         addStreamLog('🚀 Starting tool execution workflow...', 'info');
-        addStreamLog(`📋 Model selected: ${model === 'a' ? 'Model A (mistral:7b-instruct)' : 'Model B (ministral-3:8b)'}`, 'info');
+        addStreamLog(`📋 Model selected: ${model === 'a' ? 'Model A - Efficient & Fast (mistral:7b-instruct)' : 'Model B - Reliable & Accurate (ministral-3:8b q4_K_M)'}`, 'info');
 
         const startTime = performance.now();
         try {
@@ -118,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await delay(400);
 
             for (const toolCall of result.tool_calls) {
+                if (toolCall.tool_name === '_Exception') continue;
                 const args = Object.keys(toolCall.arguments).length > 0
                     ? `(${Object.entries(toolCall.arguments).map(([k, v]) => `${k}=${v}`).join(', ')})`
                     : '()';
@@ -184,7 +185,7 @@ function renderErrorMessage(errorMsg) {
             "Check the AI Agent logs for the complete story: <code>docker logs aim-ai-agent --tail 100</code> (you may need more than 50 lines)",
             "Look for repeated tool calls or 'Invalid JSON' errors in the logs",
             "The model may be stuck in a validation retry loop - check for 'Exceeded maximum retries' messages",
-            "Try using Model B instead (sometimes it's faster at structured output)",
+            "Try using Model A instead (it's faster at structured output)",
             "Restart the AI Agent if it seems stuck: <code>docker-compose restart ai-agent</code>"
         ];
     } else if (errorMsg.includes("output validation") || errorMsg.includes("UnexpectedModelBehavior") ||
@@ -192,10 +193,10 @@ function renderErrorMessage(errorMsg) {
         title = "AI Model Can't Follow Instructions";
         explanation = "The Ollama model tried to help, but kept returning conversational text instead of the structured data format it needs to return. " +
                      "This is like asking someone to fill out a form, but they just write you a letter instead. " +
-                     "Even larger models (like mistral:7b-instruct and ministral-3:8b-instruct-2512-q8_0) can occasionally struggle with structured output.";
+                     "Even larger models (like mistral:7b-instruct and ministral-3:8b-instruct-2512-q4_K_M) can occasionally struggle with structured output.";
         suggestions = [
             "Try running the repair again - sometimes it works on the second try",
-            "Try using Model B instead (it's smaller but sometimes better at following format rules)",
+            "Try using Model A instead (it's faster and good at following format rules)",
             "Check the AI Agent logs to see the exact text the model returned: <code>docker logs aim-ai-agent --tail 100</code>",
             "The model may be overloaded - check memory: <code>docker stats aim-ollama-model-a aim-ollama-model-b</code>",
             "Consider using a larger, more capable model if this persists"
@@ -231,7 +232,7 @@ function renderErrorMessage(errorMsg) {
             "The Ollama models might be overloaded or slow",
             "Check model memory usage: <code>docker stats aim-ollama-model-a aim-ollama-model-b</code>",
             "Look at AI Agent logs to see what it's doing: <code>docker logs aim-ai-agent --tail 50</code>",
-            "Try using Model B instead (it's faster but less powerful)"
+            "Try using Model A instead (it's faster for time-sensitive tasks)"
         ];
     } else if (errorMsg.includes("404")) {
         title = "AI Agent Endpoint Not Found";

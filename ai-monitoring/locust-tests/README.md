@@ -1,11 +1,11 @@
 # Locust Tests - Passive Load Generation for New Relic Telemetry
 
-Passive load generation using Locust that creates realistic background telemetry for New Relic AI monitoring demonstrations. Uses a comprehensive 18-prompt pool with weighted distribution across categories.
+Passive load generation using Locust that creates realistic background telemetry for New Relic AI monitoring demonstrations. Uses a comprehensive 19-prompt pool with weighted distribution across categories.
 
 ## Features
 
 - **Passive Load Generation**: Automatic background traffic at 5-10 requests/hour
-- **Comprehensive Prompt Pool**: 18 prompts across 6 categories (MCP, simple/complex chat, errors, boundaries, abuse)
+- **Comprehensive Prompt Pool**: 19 prompts across 6 categories (MCP, simple/complex chat, errors, boundaries, abuse)
 - **Backend Workflow Control**: MCP prompts use deterministic tool invocations
 - **Immediate Start**: First request fires within seconds via `on_start()` method
 - **A/B Model Testing**: Each prompt sent to both Model A and Model B for comparison
@@ -41,7 +41,7 @@ locust-tests/
 │  │  PassiveLoadUser (Single User Class)                   │ │
 │  │  • wait_time: constant_pacing(720) [12 minutes]        │ │
 │  │  • on_start(): Immediate first request (no wait)       │ │
-│  │  • 18-prompt pool with weighted distribution           │ │
+│  │  • 19-prompt pool with weighted distribution           │ │
 │  │  • Smart routing: /repair (workflows) vs /chat         │ │
 │  └────────────────┬───────────────────────────────────────┘ │
 │                   │                                          │
@@ -61,7 +61,7 @@ locust-tests/
 **Key Components**:
 
 1. **PassiveLoadUser**: Single user class with comprehensive prompt pool
-2. **Prompt Pool Integration**: Imports 18-prompt pool from `ai-agent/prompt_pool.py`
+2. **Prompt Pool Integration**: Imports 19-prompt pool from `ai-agent/prompt_pool.py`
 3. **Smart Routing**: Automatically routes MCP prompts to `/repair` with workflows
 4. **Immediate Start**: `on_start()` method fires first request within seconds
 5. **Locust Web UI**: Real-time statistics at port 8089
@@ -330,7 +330,7 @@ Each request generates:
 
 **Current Implementation**:
 - Single `PassiveLoadUser` class
-- Comprehensive 18-prompt pool
+- Comprehensive 19-prompt pool
 - Smart routing based on prompt metadata
 - Backend workflow control for MCP prompts
 - Immediate first request via `on_start()`

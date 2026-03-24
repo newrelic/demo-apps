@@ -276,28 +276,27 @@ def create_mcp_tools() -> List[StructuredTool]:
             args_schema=ServiceRestartInput,
             coroutine=service_restart_func,
         ),
-        # DISABLED FOR PERFORMANCE - Not needed for core demo workflows
-        # StructuredTool.from_function(
-        #     func=service_logs_func,
-        #     name="service_logs",
-        #     description="Retrieve recent logs from a service. Args: service_name (str), lines (int, default 50).",
-        #     args_schema=ServiceLogsInput,
-        #     coroutine=service_logs_func,
-        # ),
-        # StructuredTool.from_function(
-        #     func=service_config_update_func,
-        #     name="service_config_update",
-        #     description="Update service configuration. Args: service_name (str), key (str), value (str).",
-        #     args_schema=ServiceConfigUpdateInput,
-        #     coroutine=service_config_update_func,
-        # ),
-        # StructuredTool.from_function(
-        #     func=service_diagnostics_func,
-        #     name="service_diagnostics",
-        #     description="Run comprehensive diagnostics on a service. Args: service_name (str).",
-        #     args_schema=ServiceDiagnosticsInput,
-        #     coroutine=service_diagnostics_func,
-        # ),
+        StructuredTool.from_function(
+            func=service_logs_func,
+            name="service_logs",
+            description="Retrieve recent logs from a service. Args: service_name (str), lines (int, default 50).",
+            args_schema=ServiceLogsInput,
+            coroutine=service_logs_func,
+        ),
+        StructuredTool.from_function(
+            func=service_config_update_func,
+            name="service_config_update",
+            description="Update service configuration. Args: service_name (str), key (str), value (str).",
+            args_schema=ServiceConfigUpdateInput,
+            coroutine=service_config_update_func,
+        ),
+        StructuredTool.from_function(
+            func=service_diagnostics_func,
+            name="service_diagnostics",
+            description="Run comprehensive diagnostics on a service. Args: service_name (str).",
+            args_schema=ServiceDiagnosticsInput,
+            coroutine=service_diagnostics_func,
+        ),
     ]
 
     logger.info(f"[MCP-TOOLS] Created {len(tools)} tools")

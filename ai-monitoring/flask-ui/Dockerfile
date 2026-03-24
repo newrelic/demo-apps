@@ -19,7 +19,7 @@ EXPOSE 8501
 CMD ["newrelic-admin", "run-program", "gunicorn", \
      "--bind", "0.0.0.0:8501", \
      "--workers", "4", \
-     "--timeout", "120", \
+     "--timeout", "600", \
      "--log-level", "info", \
      "--error-logfile", "-", \
      "--capture-output", \

@@ -10,7 +10,7 @@ This demo showcases:
 - **Distributed Tracing**: Complete visibility across AI agent → MCP server → tool invocations
 - **AI Monitoring**: Model performance metrics, token usage, and tool invocation patterns
 - **LLM Feedback Events**: Binary thumbs-up/down ratings with smart heuristics
-- **Comprehensive Prompt Pool**: 18 test prompts across 6 categories for diverse telemetry
+- **Comprehensive Prompt Pool**: 19 test prompts across 6 categories for diverse telemetry
 - **Hallucination Detection**: Chat interface for testing boundary behaviors
 - **Passive Load Generation**: Automatic background traffic for continuous demo data
 
@@ -30,7 +30,7 @@ The system consists of 6 Docker services:
          v
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
 │     AI Agent    │◄────►│  Ollama Model A │      │  Ollama Model B │
-│  (LangChain)    │      │  (mistral:7b)   │      │(ministral q8_0) │
+│  (LangChain)    │      │  (mistral:7b)   │      │(ministral q4_K_M)│
 │  (Port: 8001)   │      │  (Port: 11434)  │      │  (Port: 11435)  │
 │  - Tool calling │      └─────────────────┘      └─────────────────┘
 │  - Workflows    │
@@ -50,7 +50,7 @@ The system consists of 6 Docker services:
          │ Passive Load (5-10 req/hour)
 ┌────────┴────────┐
 │     Locust      │ ◄── Auto-generates background traffic
-│  (Port 8089)    │     18-prompt pool → New Relic telemetry
+│  (Port 8089)    │     19-prompt pool → New Relic telemetry
 └─────────────────┘     Starts immediately on launch
 ```
 
@@ -61,9 +61,9 @@ The system consists of 6 Docker services:
 | **flask-ui** | 8501 | Flask 3.0 + gunicorn | Web interface: Home, Tools, Chat (with prompt pool), Debug | [flask-ui/README.md](flask-ui/README.md) |
 | **ai-agent** | 8001 | LangChain + FastAPI | Autonomous reasoning engine with tool calling & observability | [ai-agent/README.md](ai-agent/README.md) |
 | **mcp-server** | 8002 | FastMCP + FastAPI | Generic system operation tools (6 mock tools) | [mcp-server/README.md](mcp-server/README.md) |
-| **ollama-model-a** | 11434 | Ollama + mistral:7b-instruct-v0.3 | Reliable LLM (~4GB) | [See below](#ollama-services) |
-| **ollama-model-b** | 11435 | Ollama + ministral-3:8b-instruct-2512-q8_0 | Efficient Mistral variant (~8GB) | [See below](#ollama-services) |
-| **locust-tests** | 8089 | Locust 2.43.0 | Passive load (5-10 req/hr) with 18-prompt pool | [locust-tests/README.md](locust-tests/README.md) |
+| **ollama-model-a** | 11434 | Ollama + mistral:7b-instruct-v0.3 | Efficient & Fast LLM (~4GB) | [See below](#ollama-services) |
+| **ollama-model-b** | 11435 | Ollama + ministral-3:8b-instruct-2512-q4_K_M | Reliable & Accurate LLM (~6GB, q4_K_M) | [See below](#ollama-services) |
+| **locust-tests** | 8089 | Locust 2.43.0 | Passive load (5-10 req/hr) with 19-prompt pool | [locust-tests/README.md](locust-tests/README.md) |
 
 **For detailed service architecture, APIs, and local development, see each service's README.**
 
@@ -71,8 +71,8 @@ The system consists of 6 Docker services:
 
 Both Ollama services use pre-built Docker images with models baked in during build:
 
-- **Model A (mistral:7b-instruct-v0.3)**: ~4GB image, 4.5-5GB runtime memory, Reliable JSON formatting
-- **Model B (ministral-3:8b-instruct-2512-q8_0)**: ~8GB image, 8-10GB runtime memory, Efficient Mistral variant with 8-bit quantization for reliable tool calling
+- **Model A (mistral:7b-instruct-v0.3)**: ~4GB image, 4.5-5GB runtime memory, Efficient & Fast (~2s latency)
+- **Model B (ministral-3:8b-instruct-2512-q4_K_M)**: ~6GB image, 5-6GB runtime memory, Reliable & Accurate with 4-bit mixed quantization for fast tool calling
 - Dockerfiles: `Dockerfile.ollama-model-a` and `Dockerfile.ollama-model-b` in project root
 
 ## 📋 Prerequisites
@@ -80,12 +80,12 @@ Both Ollama services use pre-built Docker images with models baked in during bui
 ### System Requirements
 - **RAM**: Minimum 12-14GB Docker memory (16GB+ recommended)
   - Model A (mistral:7b-instruct-v0.3): ~4.5-5GB
-  - Model B (ministral-3:8b-instruct-2512-q8_0): ~8-10GB
+  - Model B (ministral-3:8b-instruct-2512-q4_K_M): ~5-6GB
   - Other services: ~1-2GB
   - **Total Required**: 12-14GB Docker memory minimum (16GB+ recommended for comfortable operation)
 - **Disk**: ~15GB free space required:
   - **Ollama Model A image**: ~4GB (mistral:7b-instruct-v0.3 baked in)
-  - **Ollama Model B image**: ~8GB (ministral-3:8b-instruct-2512-q8_0 baked in)
+  - **Ollama Model B image**: ~5GB (ministral-3:8b-instruct-2512-q4_K_M baked in)
   - **Application service images**: ~1.5GB combined (ai-agent, mcp-server, locust, flask-ui)
   - **Docker volumes**: ~500MB (ollama-data-a, ollama-data-b)
   - **Container logs**: ~200-500MB (varies with usage)
@@ -138,8 +138,8 @@ docker-compose build --no-cache
 
 This will build all 6 services (20-30 minutes):
 - Ollama Model A with mistral:7b-instruct-v0.3 (~4GB)
-- Ollama Model B with ministral-3:8b-instruct-2512-q8_0 (~8GB)
-- AI Agent (PydanticAI + New Relic instrumentation)
+- Ollama Model B with ministral-3:8b-instruct-2512-q4_K_M (~5GB)
+- AI Agent (LangChain + New Relic instrumentation)
 - MCP Server (FastMCP + generic system tools)
 - Flask UI (Web interface + Browser monitoring)
 - Locust (Background traffic generation)
@@ -179,25 +179,29 @@ http://localhost:8501
 **How to Use**:
 1. From home page, click "Tool Execution" card (or navigate to `/tools`)
 2. Select a model:
-   - **Model A (mistral:7b-instruct-v0.3)**: Reliable & Accurate (~2-4s latency)
-   - **Model B (ministral-3:8b-instruct-2512-q8_0)**: Efficient & Fast (~2-3s latency)
+   - **Model A (mistral:7b-instruct-v0.3)**: Efficient & Fast (~2s latency)
+   - **Model B (ministral-3:8b-instruct-2512-q4_K_M)**: Reliable & Accurate (q4_K_M mixed-precision)
 3. Click "Run Workflow"
-4. Watch the agent autonomously:
-   - Check system health status
-   - Read service logs
-   - Diagnose issues
-   - Execute corrective actions (restart, config updates, etc.)
-   - Run diagnostics to verify
+4. Watch the agent execute a full repair cycle using all 6 available MCP tools:
+   - Call `system_health` to assess current status
+   - Call `service_logs`, `service_diagnostics`, and `database_status` to diagnose
+   - Call `service_config_update` then `service_restart` to remediate
+   - Call `system_health` again to verify recovery
 
 **What the Agent Does**:
-- Calls `check_system_health()` to assess overall status
-- Uses `get_service_logs()` to diagnose specific issues
-- Executes `restart_service()` when needed
-- Runs `check_database_status()` to verify data layer
-- Performs `run_diagnostics()` for comprehensive checks
-- Updates configuration with `update_configuration()` if required
 
-**All tools return realistic mock data with simulated latency (0.2-3s) - no real operations performed.**
+- Runs a 7-step sequence using all 6 available MCP tools:
+  1. `system_health` — detect overall system status
+  2. `service_logs` — read api-gateway logs
+  3. `service_diagnostics` — comprehensive api-gateway health check
+  4. `database_status` — verify data layer health
+  5. `service_config_update` — update api-gateway connection pool config (requires restart)
+  6. `service_restart` — restart api-gateway to apply the config change
+  7. `system_health` — verify recovery
+- First health check may show degraded (30% chance) — the workflow proceeds regardless
+- Final health check confirms recovery (always healthy post-restart for 120s)
+
+**All tools return realistic mock data - no real operations performed.**
 
 ### Chat Mode (/chat)
 
@@ -206,8 +210,8 @@ http://localhost:8501
 **How to Use**:
 1. From home page, click "Chat Assistant" card (or navigate to `/chat`)
 2. Select a model (Model A or Model B)
-3. Choose a prompt from the dropdown (18 prompts across 6 categories):
-   - **MCP Tool Testing (2)**: Backend-controlled workflows - single tool call or full diagnostic flow
+3. Choose a prompt from the dropdown (19 prompts across 6 categories):
+   - **MCP Tool Testing (2)**: Prompt-guided workflows - single tool call or full diagnostic flow
    - **Simple Chat (5)**: Basic conversational queries
    - **Complex Chat (5)**: Multi-faceted diagnostic questions
    - **Error Scenarios (3)**: Empty prompts, invalid services, overload requests
@@ -217,7 +221,8 @@ http://localhost:8501
 5. View prompt preview before sending (category, description, full text)
 
 **What to Test**:
-- **MCP Tools**: Backend-controlled workflows with deterministic tool usage
+
+- **MCP Tools**: Prompt-guided workflows with strongly guided tool usage
 - **Hallucination**: Ask about non-existent features
 - **Prompt Injection**: Try to bypass instructions
 - **Abuse Detection**: Request destructive actions
@@ -256,13 +261,13 @@ The agent should maintain boundaries while remaining helpful, with all interacti
 3. **Service Status**: Show all 6 running containers (`docker ps`)
 4. **Tool Execution Workflow**:
    - Navigate to `/tools`
-   - Select Model A (reliable)
+   - Select Model A (Efficient & Fast)
    - Click "Run Workflow"
    - Watch agent autonomously invoke multiple tools
    - View execution results and timing
 5. **Model Comparison**:
-   - Run same workflow with Model B (efficient)
-   - Compare latency differences (Model B typically faster)
+   - Run same workflow with Model B (Reliable & Accurate)
+   - Compare latency differences (Model A ~2s, Model B with q4_K_M mixed-precision weights)
 6. **Chat Interface**:
    - Navigate to `/chat`
    - Test normal queries ("What is system status?")
@@ -303,7 +308,7 @@ docker-compose logs ollama-model-b
 
 **Current Configuration**:
 - **Model A**: mistral:7b-instruct-v0.3 (~4.5-5GB memory)
-- **Model B**: ministral-3:8b-instruct-2512-q8_0 (~8-10GB memory)
+- **Model B**: ministral-3:8b-instruct-2512-q4_K_M (~5-6GB memory)
 - **Total Required**: 12-14GB Docker memory minimum (16GB+ recommended)
 
 **Solution Option 1: Increase Docker Desktop Memory (Recommended)**
@@ -344,12 +349,12 @@ docker stop aim-ollama-model-b
 
 **Memory Requirements Summary**:
 
-| Docker Memory | Model A (7B) | Model B (8B q8_0) | Result |
-|---------------|--------------|-------------------|--------|
-| **< 12GB** | ✅ Works | ❌ Won't work | Insufficient for Model B |
-| **12-14GB** | ✅ Works | ⚠️ Tight | Minimum for operation |
-| **16GB+** | ✅ Works | ✅ Works | Recommended |
-| **20GB+** | ✅ Works | ✅ Works | Ideal for development |
+| Docker Memory | Model A (7B) | Model B (8B q4_K_M) | Result |
+| --- | --- | --- | --- |
+| **< 8GB** | ✅ Works | ❌ Won't work | Insufficient for Model B |
+| **8-10GB** | ✅ Works | ⚠️ Tight | Minimum for operation |
+| **12GB+** | ✅ Works | ✅ Works | Recommended |
+| **16GB+** | ✅ Works | ✅ Works | Ideal for development |
 
 **Check Your Current Docker Memory**:
 ```bash
@@ -690,32 +695,31 @@ The demo showcases generic DevOps/SRE operations through mock tools:
 
 ### Available System Operations
 
-1. **System Health Check**
+1. **`system_health`**
    - Returns status of all services (api-gateway, auth-service, database, cache-service)
    - Includes CPU, memory, and uptime metrics
-   - Simulated response time: 0.5-1.5 seconds
+   - Simulates real-world conditions: 30% chance api-gateway is degraded; recovers 120s after a `service_restart`
 
-2. **Service Logs**
+2. **`service_logs`**
    - Retrieves recent log entries from any service
    - Realistic log format with timestamps and levels
    - Configurable line count (default: 50)
 
-3. **Service Restart**
+3. **`service_restart`**
    - Simulates restarting a degraded or failed service
-   - Returns restart time and new process ID
-   - Delay: 1.5-3.0 seconds
+   - Returns new process ID and confirmation
+   - Instant mock operation (no simulated delay)
 
-4. **Database Status**
+4. **`database_status`**
    - Connection pool metrics and query performance
    - Includes slow query detection and cache hit rates
    - Simulated PostgreSQL database
 
-5. **Configuration Updates**
+5. **`service_config_update`**
    - Update service configuration values
    - Indicates when restart is required
-   - Fast operation: 0.2-0.5 seconds
 
-6. **Comprehensive Diagnostics**
+6. **`service_diagnostics`**
    - Multi-point health checks (endpoint, database, cache, dependencies)
    - Resource usage monitoring
    - Occasionally returns degraded status (10% of checks)
@@ -736,10 +740,10 @@ All operations return realistic JSON data and create distributed traces visible 
 
 ### What to Compare
 
-- **Speed**: Both models have similar latency (~2-4s) due to comparable size
-- **Accuracy**: Model A (mistral:7b-instruct) is the proven standard, Model B (ministral-3:8b q8_0) uses 8-bit quantization for better tool calling reliability
-- **Size**: Model A (~4GB) vs Model B (~8GB) - Model B uses higher precision quantization for more reliable structured outputs
-- **Use Case Fit**: Model A for maximum reliability, Model B as alternative with enhanced tool support via 8-bit quantization
+- **Speed**: Model A (~2s) is significantly faster than Model B (~70s) due to smaller size and lower quantization overhead
+- **Accuracy**: Model B (ministral-3:8b q4_K_M) uses 4-bit mixed quantization for reliable tool calling; Model A (mistral:7b-instruct) is lighter and faster
+- **Size**: Model A (~4GB) vs Model B (~5GB) - Model B uses q4_K_M quantization for reliable structured outputs
+- **Use Case Fit**: Model A for fast, efficient responses; Model B for reliable, accurate results
 
 ## 📊 New Relic Instrumentation
 
@@ -778,8 +782,9 @@ mcp-server (Python agent + Docker API)
 3. See full end-to-end trace across all four tiers (Browser → Flask → AI Agent → MCP Server)
 
 **AI Monitoring Data Captured**:
-- LLM model performance comparison (mistral:7b-instruct-v0.3 vs ministral-3:8b-instruct-2512-q8_0)
-- Tool call success rates (docker_ps, docker_restart, docker_logs, etc.)
+
+- LLM model performance comparison (mistral:7b-instruct-v0.3 vs ministral-3:8b-instruct-2512-q4_K_M)
+- Tool call success rates (system_health, service_restart, database_status, etc.)
 - Response latency by model
 - Token usage and costs
 - Hallucination detection patterns
@@ -804,7 +809,7 @@ ai-monitoring/
 ├── .env.example                # Configuration template
 ├── README.md                   # This file
 ├── flask-ui/                   # Web interface
-├── ai-agent/                   # PydanticAI agent
+├── ai-agent/                   # LangChain agent
 ├── mcp-server/                 # Generic system operation tools
 └── locust-tests/               # Load generation
 ```
@@ -890,32 +895,33 @@ For detailed cleanup and disk space management strategies, see the [Cleanup & Di
 
 ### Key Architecture: Backend Workflow Control
 
-**MCP Tool Prompts** (15% of load) use **backend workflow control**:
+**MCP Tool Prompts** (15% of load) use **prompt-guided workflow control**:
 
 ```
 Locust/User → /repair?model=a&workflow=minimal_single_tool
               ↓
-          Backend forces: system_health (exactly 1 call)
+          Prompt instructs: "Call system_health ONCE, then Final Answer. STOP."
               ↓
-          Returns deterministic result
+          Returns result (typically 1 tool call)
 ```
 
 ```
 Locust/User → /repair?model=b&workflow=forced_full_repair
               ↓
-          Backend forces:
+          Prompt instructs:
               1. system_health
-              2. service_restart
+              2. service_restart (api-gateway, regardless of status)
               3. system_health (verify)
               ↓
-          Returns result (3 tool calls, predictable)
+          Returns result (typically 3 tool calls, in order)
 ```
 
 **Benefits**:
-- ✅ Deterministic tool usage (always same number/sequence)
-- ✅ Consistent telemetry (predictable token counts)
-- ✅ No LLM reasoning variability
-- ✅ Perfect for A/B model comparison
+
+- ✅ Strongly guided tool usage (explicit prompt instructions)
+- ✅ Consistent telemetry (low variability in token counts)
+- ✅ Minimal LLM reasoning variability (prompt-guided, not free-form)
+- ✅ Good for A/B model comparison
 
 **Chat Prompts** (85% of load) use **LLM-decided tool usage**:
 
@@ -966,8 +972,8 @@ newrelic.agent.record_llm_feedback_event(
 
 | Category | Count | Endpoint | Workflow | LLM Control | Weight |
 |----------|-------|----------|----------|-------------|--------|
-| MCP Healthy | 1 | `/repair` | `minimal_single_tool` | ❌ Backend | 10% |
-| MCP Degraded | 1 | `/repair` | `forced_full_repair` | ❌ Backend | 5% |
+| MCP Healthy | 1 | `/repair` | `minimal_single_tool` | Prompt-guided | 10% |
+| MCP Degraded | 1 | `/repair` | `forced_full_repair` | Prompt-guided | 5% |
 | Simple Chat | 5 | `/chat` | N/A | ✅ LLM | 35% |
 | Complex Chat | 5 | `/chat` | N/A | ✅ LLM | 30% |
 | Error Scenarios | 3 | `/chat` | N/A | ✅ LLM | 10% |

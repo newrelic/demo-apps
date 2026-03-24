@@ -8,8 +8,10 @@ Provides:
 - A/B model comparison support
 """
 
+import asyncio
 import os
 import logging
+import re
 import time
 from contextlib import asynccontextmanager
 from typing import Literal
@@ -18,11 +20,19 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import newrelic.agent
 
+# Per-model semaphores: OLLAMA_NUM_PARALLEL=1 means only 1 concurrent inference per
+# Ollama instance. Without serialization here, concurrent requests from Locust + UI
+# race at the inference layer causing queuing/contention. Initialized in lifespan
+# to ensure we're inside the event loop.
+_model_semaphores: dict[str, asyncio.Semaphore] = {}
+
 # LangChain agent components
 from langchain_agent import (
     init_router,
+    init_chat_router,
     get_router,
     run_agent_workflow,
+    run_chat_workflow,
     get_all_metrics,
 )
 from prompts import REPAIR_PROMPT_TEMPLATE, CHAT_PROMPT_TEMPLATE
@@ -57,6 +67,10 @@ async def lifespan(app: FastAPI):
 
     Initializes ModelRouter with agents on startup.
     """
+    # Initialize per-model semaphores inside the event loop
+    _model_semaphores["a"] = asyncio.Semaphore(1)
+    _model_semaphores["b"] = asyncio.Semaphore(1)
+
     logger.info("=" * 60)
     logger.info("🤖 AI Agent Service Starting (LangChain)")
     logger.info("=" * 60)
@@ -65,12 +79,19 @@ async def lifespan(app: FastAPI):
     logger.info(f"MCP Server: {os.getenv('MCP_SERVER_URL')}")
     logger.info("=" * 60)
 
-    # Initialize LangChain agent router
+    # Initialize LangChain agent routers
     try:
         init_router(REPAIR_PROMPT_TEMPLATE)
-        logger.info("✅ ModelRouter initialized successfully")
+        logger.info("✅ Repair ModelRouter initialized successfully")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize ModelRouter: {e}", exc_info=True)
+        logger.error(f"❌ Failed to initialize repair ModelRouter: {e}", exc_info=True)
+        raise
+
+    try:
+        init_chat_router(CHAT_PROMPT_TEMPLATE)
+        logger.info("✅ Chat ModelRouter initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize chat ModelRouter: {e}", exc_info=True)
         raise
 
     # Register New Relic application (for metadata)
@@ -92,6 +113,33 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("AI Agent Service shutting down...")
+
+
+def clean_chat_output(text: str) -> str:
+    """Strip leaked ReAct format tokens from chat output.
+
+    1. If a Final Answer: marker is present, return only its content.
+    2. Otherwise strip everything from the first ReAct token (Thought/Action/
+       Observation) onwards, keeping any valid prose that precedes it.
+       Exception: if the prose is just an echoed question (short text ending
+       with '?'), discard it and return an empty string.
+    """
+    # 1. Extract Final Answer when present (model responded correctly but
+    #    handle_parsing_errors returned the raw text instead of parsed output)
+    fa_match = re.search(r'Final Answer:\s*(.*?)$', text, re.DOTALL | re.IGNORECASE)
+    if fa_match:
+        return fa_match.group(1).strip()
+
+    # 2. Strip ReAct tokens
+    match = re.search(r'(^|\n+)(Thought|Action Input|Action|Observation):\s', text)
+    if match:
+        prose = text[:match.start()].strip()
+        # Discard prose that looks like an echoed question (short, ends with ?)
+        if not prose or (prose.endswith('?') and len(prose) < 200):
+            return ""
+        return prose
+
+    return text.strip()
 
 
 # Create FastAPI application
@@ -130,7 +178,6 @@ async def health_check():
 @app.post("/repair", response_model=RepairResult)
 async def trigger_repair(
     model: Literal["a", "b"] = "a",
-    deterministic: bool = False,
     workflow: str = None
 ):
     """
@@ -138,29 +185,30 @@ async def trigger_repair(
 
     Args:
         model: Which model to use ("a" or "b")
-        deterministic: If True, uses predictable workflow for load testing
-        workflow: Optional workflow name (e.g., "minimal_single_tool") - overrides deterministic
+        workflow: Workflow name to execute (e.g., "forced_full_repair", "minimal_single_tool")
 
     Returns:
         RepairResult with actions taken and outcome
     """
     start_time_req = time.time()
-    logger.info(f"[REPAIR] Request: model={model}, deterministic={deterministic}, workflow={workflow}")
+    logger.info(f"[REPAIR] Request: model={model}, workflow={workflow}")
 
     try:
-        # Get prompt - workflow parameter overrides deterministic
+        # Get prompt from workflow name
         if workflow:
             prompt = get_workflow_prompt(workflow)
-            logger.info(f"[REPAIR] Using custom workflow: {workflow}")
-        elif deterministic:
-            prompt = get_workflow_prompt("repair_deterministic")
-            logger.info("[REPAIR] Using deterministic workflow")
+            logger.info(f"[REPAIR] Using workflow: {workflow}")
         else:
             prompt = get_workflow_prompt("repair_open_ended")
-            logger.info("[REPAIR] Using open-ended workflow")
+            logger.info("[REPAIR] Using open-ended workflow (no workflow specified)")
 
-        # Execute agent workflow
-        result = await run_agent_workflow(model, prompt)
+        # All workflows use the repair router (REPAIR_PROMPT_TEMPLATE).
+        # The repair prompt has concrete few-shot examples showing how to use
+        # observation data — more reliable than CHAT_PROMPT for weaker models.
+        # Serialize per-model: OLLAMA_NUM_PARALLEL=1, so concurrent requests from
+        # Locust and the UI would contend at the inference layer without this.
+        async with _model_semaphores[model]:
+            result = await run_agent_workflow(model, prompt)
 
         # Extract tool calls from intermediate steps
         tool_calls = []
@@ -173,6 +221,10 @@ async def trigger_repair(
                 # Extract tool name and arguments
                 tool_name = action.tool if hasattr(action, 'tool') else str(action)
                 tool_input = action.tool_input if hasattr(action, 'tool_input') else {}
+
+                # Skip LangChain internal parsing error artifacts
+                if tool_name == '_Exception':
+                    continue
 
                 tool_calls.append(ToolCall(
                     tool_name=tool_name,
@@ -249,8 +301,10 @@ async def chat(request: ChatRequest):
     logger.info(f"[CHAT] Request: model={request.model}, message={request.message[:50]}...")
 
     try:
-        # Execute chat workflow
-        result = await run_agent_workflow(request.model, request.message)
+        # Execute chat workflow using chat-specific prompt (no forced system_health)
+        # Serialize per-model to avoid concurrent inference on the same Ollama instance.
+        async with _model_semaphores[request.model]:
+            result = await run_chat_workflow(request.model, request.message)
 
         model_name = result['model_name']
 
@@ -260,7 +314,7 @@ async def chat(request: ChatRequest):
         )
 
         return ChatResponse(
-            response=result['output'],
+            response=clean_chat_output(result['output']),
             model_used=model_name,
             latency_seconds=result['latency_seconds']
         )
@@ -424,7 +478,7 @@ async def root():
         "framework": "langchain",
         "models": {
             "a": os.getenv("MODEL_A_NAME", "mistral:7b-instruct"),
-            "b": os.getenv("MODEL_B_NAME", "ministral-3:8b-instruct-2512-q8_0")
+            "b": os.getenv("MODEL_B_NAME", "ministral-3:8b-instruct-2512-q4_K_M")
         },
         "endpoints": {
             "repair": "POST /repair?model={a|b}&workflow={workflow_name}",

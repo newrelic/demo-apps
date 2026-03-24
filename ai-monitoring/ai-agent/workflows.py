@@ -7,7 +7,7 @@ Provides predefined prompts and workflow patterns for:
 - Tool chaining examples
 """
 
-from typing import Dict, Literal
+from typing import Dict
 
 # ===== Infrastructure/DevOps Workflows =====
 
@@ -17,12 +17,12 @@ MINIMAL_SINGLE_TOOL = """Your task: Call system_health ONCE, then immediately pr
 
 STOP after 1 tool call. Do NOT call any other tools. DO NOT verify or check again."""
 
-FORCED_FULL_REPAIR = """Perform a complete repair workflow test:
-1. Call system_health to check the system
-2. Call service_restart to restart the api-gateway service (regardless of status)
-3. Call system_health again to verify the system
+FORCED_FULL_REPAIR = """Perform a complete repair workflow:
+1. Call system_health to check overall system status
+2. Call service_restart to restart api-gateway (regardless of status)
+3. Call system_health again to verify the system has recovered
 
-Execute all 3 steps in order to demonstrate the full workflow."""
+Execute all 3 steps in order. After step 3, output your Final Answer."""
 
 REPAIR_WORKFLOW_DETERMINISTIC = """
 Check system health. If the api-gateway service is degraded or has errors, read its logs
@@ -34,6 +34,7 @@ If all services are healthy and logs show no errors, respond with "System is hea
 REPAIR_WORKFLOW_OPEN_ENDED = """
 Check the system and identify any issues. Diagnose the root cause by examining logs
 and diagnostics. Take appropriate corrective actions to restore the system to a healthy state.
+If the system is already healthy and no issues are found, report that as your Final Answer.
 """
 
 DIAGNOSTICS_WORKFLOW = """
@@ -180,70 +181,3 @@ def list_workflows() -> Dict[str, str]:
         "invalid_service": "Test with invalid service name",
         "multiple_restarts": "Restart multiple services sequentially",
     }
-
-
-# ===== Workflow Execution Helpers =====
-
-async def run_workflow(
-    workflow_name: str,
-    model: Literal["a", "b"] = "a",
-    **params
-) -> Dict:
-    """
-    Execute a named workflow with the specified model.
-
-    Args:
-        workflow_name: Name of workflow template
-        model: Model to use ("a" or "b")
-        **params: Parameters to substitute into workflow template
-
-    Returns:
-        Workflow execution result
-
-    Example:
-        >>> result = await run_workflow("health_check", model="a")
-        >>> print(result['output'])
-    """
-    from langchain_agent import run_agent_workflow
-
-    prompt = get_workflow_prompt(workflow_name, **params)
-    return await run_agent_workflow(model, prompt)
-
-
-# ===== Locust Integration Helpers =====
-
-# Deterministic prompts for load testing (consistent behavior)
-LOCUST_DETERMINISTIC_PROMPTS = [
-    REPAIR_WORKFLOW_DETERMINISTIC,
-    HEALTH_CHECK_WORKFLOW,
-    DIAGNOSTICS_WORKFLOW,
-    DATABASE_CHECK_WORKFLOW,
-]
-
-# Varied prompts for realistic traffic simulation
-LOCUST_VARIED_PROMPTS = [
-    HEALTH_CHECK_WORKFLOW,
-    REPAIR_WORKFLOW_OPEN_ENDED,
-    DIAGNOSTICS_WORKFLOW,
-    DATABASE_CHECK_WORKFLOW,
-    CONFIG_UPDATE_WORKFLOW,
-    MULTI_STEP_REPAIR,
-    STATUS_QUERY,
-    SERVICE_INFO_QUERY,
-]
-
-
-def get_locust_prompt(deterministic: bool = True) -> str:
-    """
-    Get a random prompt suitable for Locust load testing.
-
-    Args:
-        deterministic: If True, return only deterministic prompts;
-                      if False, return varied prompts
-
-    Returns:
-        Random prompt from the appropriate set
-    """
-    import random
-    prompts = LOCUST_DETERMINISTIC_PROMPTS if deterministic else LOCUST_VARIED_PROMPTS
-    return random.choice(prompts)
