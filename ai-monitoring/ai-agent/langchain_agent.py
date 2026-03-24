@@ -42,8 +42,22 @@ class JSONReActOutputParser(ReActSingleInputOutputParser):
     """
 
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
-        # --- Fix 1: strip () from tool names ---
-        text = re.sub(r'^(Action:\s*\w+)\(\)', r'\1', text, flags=re.MULTILINE)
+        # --- Fix 1: strip markdown + () from tool names ---
+        # Handles: ** `system_health` **()  →  system_health
+        #          `system_health`()         →  system_health
+        #          system_health()           →  system_health
+        text = re.sub(
+            r'^(Action:\s*)\*+\s*`?(\w+)`?\s*\*+\s*\(\)',
+            r'\1\2', text, flags=re.MULTILINE
+        )
+        text = re.sub(r'^(Action:\s*)`(\w+)`\s*\(\)', r'\1\2', text, flags=re.MULTILINE)
+        text = re.sub(r'^(Action:\s*)(\w+)\(\)', r'\1\2', text, flags=re.MULTILINE)
+        # Also strip markdown without parens: ** `system_health` **  →  system_health
+        text = re.sub(
+            r'^(Action:\s*)\*+\s*`(\w+)`\s*\*+',
+            r'\1\2', text, flags=re.MULTILINE
+        )
+        text = re.sub(r'^(Action:\s*)`(\w+)`', r'\1\2', text, flags=re.MULTILINE)
 
         # --- Fix 2: numbered-list action → first valid tool name ---
         list_match = re.search(
