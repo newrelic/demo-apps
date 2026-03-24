@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Order Confirmation - Bad Apples Orchard{% endblock %}
+
+{% block content %}
+<section class="order-confirmation">
+    <div class="confirmation-message">
+        <h1>Thank You for Your Order!</h1>
+        <p class="order-number">Order #{{ order.id }}</p>
+        <p class="success-message">Your order has been placed successfully and will be delivered soon.</p>
+    </div>
+
+    <div class="order-details">
+        <h2>Order Details</h2>
+
+        <div class="customer-info">
+            <h3>Delivery Information</h3>
+            <p><strong>Name:</strong> {{ order.customer_name }}</p>
+            <p><strong>Email:</strong> {{ order.customer_email }}</p>
+            {% if order.customer_phone %}
+            <p><strong>Phone:</strong> {{ order.customer_phone }}</p>
+            {% endif %}
+            <p><strong>Address:</strong> {{ order.delivery_address }}</p>
+        </div>
+
+        <div class="order-items">
+            <h3>Items Ordered</h3>
+            <table class="cart-table">
+                <thead>
+                    <tr>
+                        <th>Apple Variety</th>
+                        <th>Quantity (lbs)</th>
+                        <th>Price/lb</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order['items'] %}
+                    <tr>
+                        <td>{{ item.variety_name }}</td>
+                        <td>{{ "%.1f"|format(item.quantity_lbs|float) }}</td>
+                        <td>${{ "%.2f"|format(item.unit_price|float) }}</td>
+                        <td>${{ "%.2f"|format(item.subtotal|float) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3"><strong>Total:</strong></td>
+                        <td><strong>${{ "%.2f"|format(order.total_amount|float) }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="order-status">
+            <p><strong>Status:</strong> <span class="status-{{ order.status }}">{{ order.status|title }}</span></p>
+            <p><strong>Order Date:</strong> {{ order.created_at }}</p>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a href="/catalog" class="btn btn-primary">Continue Shopping</a>
+        <a href="/" class="btn btn-secondary">Back to Home</a>
+    </div>
+</section>
+{% endblock %}
