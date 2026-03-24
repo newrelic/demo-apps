@@ -169,7 +169,7 @@ class ModelRouter:
             agent=agent,
             tools=self.tools,
             callbacks=[nr_callback],
-            handle_parsing_errors=True,  # Graceful fallback for parsing errors
+            handle_parsing_errors="Invalid format. Respond with ONLY:\nThought: All steps complete\nFinal Answer: [brief summary of what was done]",
             max_iterations=AGENT_MAX_ITERATIONS,
             max_execution_time=AGENT_MAX_EXECUTION_TIME,
             return_intermediate_steps=True,  # Capture tool execution traces
