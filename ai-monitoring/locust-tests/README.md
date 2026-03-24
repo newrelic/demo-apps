@@ -215,7 +215,7 @@ Visit **http://localhost:8089** to view:
 ```yaml
 locust:
   command: >
-    --headless
+    --autostart
     --web-host 0.0.0.0
     --web-port 8089
     --host http://ai-agent:8001

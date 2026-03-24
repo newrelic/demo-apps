@@ -91,7 +91,7 @@ Trigger tool execution workflow with specified model and optional prompt-guided 
 ```json
 {
   "success": true,
-  "model_used": "mistral:7b-instruct-v0.3",
+  "model_used": "mistral:7b-instruct",
   "latency_seconds": 2.45,
   "actions_taken": [
     "Checked system health status",
@@ -127,7 +127,7 @@ Interactive chat with the agent.
 ```json
 {
   "response": "The system is currently healthy. All services are running...",
-  "model_used": "mistral:7b-instruct-v0.3",
+  "model_used": "mistral:7b-instruct",
   "latency_seconds": 0.52
 }
 ```
@@ -155,7 +155,7 @@ Detailed agent status with model information.
   "models": {
     "model_a": {
       "url": "http://ollama-model-a:11434",
-      "name": "mistral:7b-instruct-v0.3"
+      "name": "mistral:7b-instruct"
     },
     "model_b": {
       "url": "http://ollama-model-b:11434",
@@ -270,7 +270,7 @@ pip install -r requirements.txt
 # Set environment variables
 export OLLAMA_MODEL_A_URL=http://localhost:11434
 export OLLAMA_MODEL_B_URL=http://localhost:11435
-export MODEL_A_NAME=mistral:7b-instruct-v0.3
+export MODEL_A_NAME=mistral:7b-instruct
 export MODEL_B_NAME=ministral-3:8b-instruct-2512-q4_K_M
 export MCP_SERVER_URL=http://localhost:8002
 export AGENT_PORT=8001
@@ -308,7 +308,7 @@ curl http://localhost:8001/status
 |----------|----------|---------|-------------|
 | `OLLAMA_MODEL_A_URL` | Yes | - | URL for Model A Ollama instance |
 | `OLLAMA_MODEL_B_URL` | Yes | - | URL for Model B Ollama instance |
-| `MODEL_A_NAME` | Yes | - | Model name (e.g., mistral:7b-instruct-v0.3) |
+| `MODEL_A_NAME` | Yes | - | Model name (e.g., mistral:7b-instruct) |
 | `MODEL_B_NAME` | Yes | - | Model name (e.g., ministral-3:8b-instruct-2512-q4_K_M) |
 | `MCP_SERVER_URL` | Yes | - | MCP server URL for tool calling |
 | `AGENT_PORT` | No | 8001 | Port to run agent service |

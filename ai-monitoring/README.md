@@ -61,7 +61,7 @@ The system consists of 6 Docker services:
 | **flask-ui** | 8501 | Flask 3.0 + gunicorn | Web interface: Home, Tools, Chat (with prompt pool), Debug | [flask-ui/README.md](flask-ui/README.md) |
 | **ai-agent** | 8001 | LangChain + FastAPI | Autonomous reasoning engine with tool calling & observability | [ai-agent/README.md](ai-agent/README.md) |
 | **mcp-server** | 8002 | FastMCP + FastAPI | Generic system operation tools (6 mock tools) | [mcp-server/README.md](mcp-server/README.md) |
-| **ollama-model-a** | 11434 | Ollama + mistral:7b-instruct-v0.3 | Efficient & Fast LLM (~4GB) | [See below](#ollama-services) |
+| **ollama-model-a** | 11434 | Ollama + mistral:7b-instruct | Efficient & Fast LLM (~4GB) | [See below](#ollama-services) |
 | **ollama-model-b** | 11435 | Ollama + ministral-3:8b-instruct-2512-q4_K_M | Reliable & Accurate LLM (~6GB, q4_K_M) | [See below](#ollama-services) |
 | **locust-tests** | 8089 | Locust 2.43.0 | Passive load (5-10 req/hr) with 19-prompt pool | [locust-tests/README.md](locust-tests/README.md) |
 
@@ -71,7 +71,7 @@ The system consists of 6 Docker services:
 
 Both Ollama services use pre-built Docker images with models baked in during build:
 
-- **Model A (mistral:7b-instruct-v0.3)**: ~4GB image, 4.5-5GB runtime memory, Efficient & Fast (~2s latency)
+- **Model A (mistral:7b-instruct)**: ~4GB image, 4.5-5GB runtime memory, Efficient & Fast (~2s latency)
 - **Model B (ministral-3:8b-instruct-2512-q4_K_M)**: ~6GB image, 5-6GB runtime memory, Reliable & Accurate with 4-bit mixed quantization for fast tool calling
 - Dockerfiles: `Dockerfile.ollama-model-a` and `Dockerfile.ollama-model-b` in project root
 
@@ -79,12 +79,12 @@ Both Ollama services use pre-built Docker images with models baked in during bui
 
 ### System Requirements
 - **RAM**: Minimum 12-14GB Docker memory (16GB+ recommended)
-  - Model A (mistral:7b-instruct-v0.3): ~4.5-5GB
+  - Model A (mistral:7b-instruct): ~4.5-5GB
   - Model B (ministral-3:8b-instruct-2512-q4_K_M): ~5-6GB
   - Other services: ~1-2GB
   - **Total Required**: 12-14GB Docker memory minimum (16GB+ recommended for comfortable operation)
 - **Disk**: ~15GB free space required:
-  - **Ollama Model A image**: ~4GB (mistral:7b-instruct-v0.3 baked in)
+  - **Ollama Model A image**: ~4GB (mistral:7b-instruct baked in)
   - **Ollama Model B image**: ~5GB (ministral-3:8b-instruct-2512-q4_K_M baked in)
   - **Application service images**: ~1.5GB combined (ai-agent, mcp-server, locust, flask-ui)
   - **Docker volumes**: ~500MB (ollama-data-a, ollama-data-b)
@@ -137,7 +137,7 @@ docker-compose build --no-cache
 ```
 
 This will build all 6 services (20-30 minutes):
-- Ollama Model A with mistral:7b-instruct-v0.3 (~4GB)
+- Ollama Model A with mistral:7b-instruct (~4GB)
 - Ollama Model B with ministral-3:8b-instruct-2512-q4_K_M (~5GB)
 - AI Agent (LangChain + New Relic instrumentation)
 - MCP Server (FastMCP + generic system tools)
@@ -179,7 +179,7 @@ http://localhost:8501
 **How to Use**:
 1. From home page, click "Tool Execution" card (or navigate to `/tools`)
 2. Select a model:
-   - **Model A (mistral:7b-instruct-v0.3)**: Efficient & Fast (~2s latency)
+   - **Model A (mistral:7b-instruct)**: Efficient & Fast (~2s latency)
    - **Model B (ministral-3:8b-instruct-2512-q4_K_M)**: Reliable & Accurate (q4_K_M mixed-precision)
 3. Click "Run Workflow"
 4. Watch the agent execute a 3-step repair cycle:
@@ -285,7 +285,7 @@ This section covers common issues and solutions for the entire system. For servi
 
 **Symptom**: In the UI, you see errors like:
 ```
-Error: status_code: 500, model_name: mistral:7b-instruct-v0.3, body: {'message': 'llama runner process has terminated: signal: killed'}
+Error: status_code: 500, model_name: mistral:7b-instruct, body: {'message': 'llama runner process has terminated: signal: killed'}
 ```
 
 Or in Docker logs:
@@ -302,7 +302,7 @@ docker-compose logs ollama-model-b
 3. **In logs**: `docker-compose logs ollama-model-a` (or `b`) shows the process being killed
 
 **Current Configuration**:
-- **Model A**: mistral:7b-instruct-v0.3 (~4.5-5GB memory)
+- **Model A**: mistral:7b-instruct (~4.5-5GB memory)
 - **Model B**: ministral-3:8b-instruct-2512-q4_K_M (~5-6GB memory)
 - **Total Required**: 12-14GB Docker memory minimum (16GB+ recommended)
 
@@ -778,7 +778,7 @@ mcp-server (Python agent + Docker API)
 
 **AI Monitoring Data Captured**:
 
-- LLM model performance comparison (mistral:7b-instruct-v0.3 vs ministral-3:8b-instruct-2512-q4_K_M)
+- LLM model performance comparison (mistral:7b-instruct vs ministral-3:8b-instruct-2512-q4_K_M)
 - Tool call success rates (system_health, service_restart, database_status, etc.)
 - Response latency by model
 - Token usage and costs
@@ -791,6 +791,7 @@ NEW_RELIC_LICENSE_KEY=your_license_key
 NEW_RELIC_APP_NAME_AI_AGENT=aim-demo_ai-agent
 NEW_RELIC_APP_NAME_MCP_SERVER=aim-demo_mcp-server
 NEW_RELIC_APP_NAME_FLASK_UI=aim-demo_flask-ui
+NEW_RELIC_LABELS=demo:aim-demo
 ```
 
 ## 🛠️ Development
@@ -874,7 +875,7 @@ For detailed cleanup and disk space management strategies, see the [Cleanup & Di
 1. **First Build Takes Time**: Initial image build takes 20-30 minutes to build all services (one-time only)
 2. **Memory Usage**: Requires 12-14GB Docker memory allocation minimum (16GB+ recommended)
 3. **Docker Socket**: Requires privileged access on some systems
-4. **Port Conflicts**: Ensure ports 8000, 8001, 8002, 8089, 8501, 11434, 11435 are available
+4. **Port Conflicts**: Ensure ports 8001, 8002, 8089, 8501, 11434, 11435 are available
 5. **Model "signal: killed"**: If you see this error, your Docker memory is too low - see [Troubleshooting](#-troubleshooting)
 
 ## 📚 Next Steps
@@ -955,7 +956,7 @@ newrelic.agent.record_llm_feedback_event(
     message="Quick and helpful response (2.3s)",
     metadata={
         'model_variant': 'a',
-        'model_name': 'mistral:7b-instruct-v0.3',
+        'model_name': 'mistral:7b-instruct',
         'tool_count': 2,
         'latency_seconds': 2.34,
         'prompt_length': 45

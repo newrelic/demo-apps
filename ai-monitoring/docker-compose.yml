@@ -100,7 +100,7 @@ services:
       - aim-network
     restart: unless-stopped
 
-  # AI Agent - PydanticAI reasoning engine with A/B model support
+  # AI Agent - LangChain reasoning engine with A/B model support
   ai-agent:
     build:
       context: ./ai-agent
@@ -116,7 +116,7 @@ services:
       - MODEL_B_NAME=${MODEL_B_NAME}
       - AGENT_PORT=${AGENT_PORT}
       - AGENT_MAX_ITERATIONS=${AGENT_MAX_ITERATIONS:-10}
-      - AGENT_MAX_EXECUTION_TIME=${AGENT_MAX_EXECUTION_TIME:-300}  # 300s default; set higher (e.g. 600) on GPU
+      - AGENT_MAX_EXECUTION_TIME=${AGENT_MAX_EXECUTION_TIME:-600}  # 600s to support forced_full_repair (3 steps × ~70s each)
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME_AI_AGENT}
       - NEW_RELIC_LABELS=${NEW_RELIC_LABELS}

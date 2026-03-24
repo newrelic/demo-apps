@@ -33,7 +33,7 @@ mcp-server/
 ├── config.py            # Environment configuration
 ├── tools/
 │   ├── docker_tools.py  # Docker container management tools
-│   └── locust_tools.py  # Load testing control tools
+│   └── system_tools.py  # Generic system operation tools (mock data)
 ├── requirements.txt     # Python dependencies
 ├── Dockerfile           # Container configuration
 └── newrelic.ini        # New Relic APM configuration
