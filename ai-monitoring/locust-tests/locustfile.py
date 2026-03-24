@@ -37,7 +37,7 @@ class PassiveLoadUser(HttpUser):
 
     Configuration:
     - Runs 5-10 requests per hour (configured via constant_pacing)
-    - Uses comprehensive 18-prompt pool with weighted distribution:
+    - Uses comprehensive 19-prompt pool with weighted distribution:
       - MCP prompts: 15% (healthy: 10%, degraded: 5%)
       - Simple chat: 35%
       - Complex chat: 30%
@@ -144,7 +144,7 @@ class PassiveLoadUser(HttpUser):
             json=request_body,
             catch_response=True,
             name=f"{category} (Model {model.upper()})",
-            timeout=120  # 2 minute timeout for complex workflows
+            timeout=600  # 10 minute timeout for complex workflows (Model B ~70s/call × 7 steps)
         ) as response:
             if response.status_code == 200:
                 try:
@@ -174,7 +174,7 @@ class PassiveLoadUser(HttpUser):
 #
 # Configuration:
 #   - 1 user = ~10 requests/hour (5 per model)
-#   - Comprehensive 18-prompt pool with weighted distribution
+#   - Comprehensive 19-prompt pool with weighted distribution
 #   - Automatic feedback event generation via New Relic
 #   - A/B model comparison (each prompt sent to both models)
 #

@@ -4,6 +4,7 @@ console.log('[Chat] Initializing chat mode');
 
 // Store prompts globally
 let availablePrompts = [];
+let currentLoadedPrompt = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[Chat] DOM loaded, setting up chat controls');
@@ -80,7 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const prompt = availablePrompts[idx];
         chatInput.value = prompt.prompt;
-        console.log('[Chat] Loaded prompt into input:', prompt.category);
+        currentLoadedPrompt = prompt;
+        console.log('[Chat] Loaded prompt into input:', prompt.category, '| use_workflow:', prompt.use_workflow);
     });
 
     // Load random prompt
@@ -96,7 +98,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const prompt = availablePrompts[randomIdx];
         chatInput.value = prompt.prompt;
-        console.log('[Chat] Random prompt loaded:', prompt.category);
+        currentLoadedPrompt = prompt;
+        console.log('[Chat] Random prompt loaded:', prompt.category, '| use_workflow:', prompt.use_workflow);
     });
 
     // Send message
@@ -104,13 +107,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const message = chatInput.value;
 
         const model = modelSelect.value;
-        const endpoint = model === 'compare' ? '/chat/compare' : '/chat/send';
 
-        console.log('[Chat] Sending message:', { message: message.substring(0, 50) + '...', model });
+        // Route MCP workflow prompts to the repair endpoint instead of chat
+        const useWorkflow = currentLoadedPrompt && currentLoadedPrompt.use_workflow;
+        const workflow = useWorkflow ? currentLoadedPrompt.workflow : null;
+        const endpoint = useWorkflow ? '/chat/send-workflow'
+            : model === 'compare' ? '/chat/compare'
+            : '/chat/send';
+
+        console.log('[Chat] Sending message:', { message: message.substring(0, 50) + '...', model, endpoint, workflow });
 
         // Add user message to UI immediately
         appendMessage('user', message);
         chatInput.value = '';
+        currentLoadedPrompt = null;
         sendBtn.disabled = true;
 
         // Show thinking indicator
@@ -119,7 +129,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const startTime = performance.now();
         try {
-            const result = await api.post(endpoint, { message, model });
+            const payload = useWorkflow ? { message, model, workflow } : { message, model };
+            const result = await api.post(endpoint, payload);
             const duration = performance.now() - startTime;
             console.log(`[Chat] Response received in ${(duration / 1000).toFixed(2)}s`);
 

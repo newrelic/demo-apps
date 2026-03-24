@@ -43,6 +43,40 @@ def send_message():
     return jsonify(result)
 
 
+@bp.route('/send-workflow', methods=['POST'])
+def send_workflow():
+    """Send a prompt through the repair workflow (for MCP tool prompts)."""
+    agent_client = get_agent_client()
+    data = request.get_json()
+    message = data.get('message', '')
+    model = data.get('model', 'a')
+    workflow = data.get('workflow', 'forced_full_repair')
+
+    add_chat_message('user', message)
+
+    result = agent_client.trigger_repair(model, workflow)
+
+    if 'error' in result:
+        add_chat_message('assistant', f"Error: {result['error']}", model)
+        return jsonify({'error': result['error']})
+
+    # Format repair result as a chat response
+    actions = result.get('actions_taken', [])
+    final_status = result.get('final_status', '')
+    model_used = result.get('model_used', model)
+    success = result.get('success', False)
+
+    if success and actions:
+        response_text = f"Workflow completed. Actions taken: {', '.join(actions)}."
+    elif not success:
+        response_text = f"Workflow failed. {final_status}"
+    else:
+        response_text = final_status or "Workflow completed."
+
+    add_chat_message('assistant', response_text, model_used)
+    return jsonify({'response': response_text, 'model_used': model_used, 'latency_seconds': result.get('latency_seconds', 0)})
+
+
 @bp.route('/clear', methods=['POST'])
 def clear_history():
     """Clear chat history from session."""

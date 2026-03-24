@@ -23,7 +23,7 @@ class AgentClient:
         """
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
-        self.session.timeout = 180  # 3 minutes timeout for repairs
+        self.session.timeout = 300  # 5 minutes; sufficient for 3-step deterministic workflow
 
     def health_check(self) -> Dict[str, Any]:
         """Check agent service health."""
@@ -34,26 +34,27 @@ class AgentClient:
         except Exception as e:
             return {"error": str(e)}
 
-    def trigger_repair(self, model: str = "a") -> Dict[str, Any]:
+    def trigger_repair(self, model: str = "a", workflow: str = "forced_full_repair") -> Dict[str, Any]:
         """
         Trigger a repair workflow.
 
         Args:
             model: Which model to use ("a" or "b")
+            workflow: Workflow name to execute (default: "forced_full_repair")
 
         Returns:
             Repair result dictionary
         """
         start_time = time.time()
         url = f"{self.base_url}/repair"
-        timeout = 180
+        timeout = 300
 
-        logger.info(f"[AGENT-CLIENT] Sending repair request - url={url}, model={model}, timeout={timeout}s")
+        logger.info(f"[AGENT-CLIENT] Sending repair request - url={url}, model={model}, workflow={workflow}, timeout={timeout}s")
 
         try:
             response = self.session.post(
                 url,
-                params={"model": model},
+                params={"model": model, "workflow": workflow},
                 timeout=timeout
             )
             elapsed = time.time() - start_time

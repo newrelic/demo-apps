@@ -3,11 +3,11 @@ FROM ollama/ollama:latest
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Pre-download the ministral-3:8b-instruct-2512-q8_0 model during build
-# (efficient Mistral variant with 8-bit quantization for better tool calling)
+# Pre-download the ministral-3:8b-instruct-2512-q4_K_M model during build
+# (efficient Mistral variant with 4-bit mixed quantization for fast tool calling)
 RUN ollama serve & \
     sleep 10 && \
-    ollama pull ministral-3:8b-instruct-2512-q8_0 && \
+    ollama pull ministral-3:8b-instruct-2512-q4_K_M && \
     pkill ollama
 
 # Default command to serve

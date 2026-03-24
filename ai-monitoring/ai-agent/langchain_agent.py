@@ -7,17 +7,80 @@ Provides:
 - Async execution support
 """
 
+import json
+import re
 import os
 import logging
-from typing import Literal, Dict, Any, List
+from typing import Literal, Dict, Any, List, Union
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_react_agent, AgentExecutor
+from langchain.agents.output_parsers.react_single_input import ReActSingleInputOutputParser
 from langchain.prompts import PromptTemplate
+from langchain_core.agents import AgentAction, AgentFinish
 
 from mcp_tools import create_mcp_tools
 from observability import NewRelicCallback, MetricsTracker
 
 logger = logging.getLogger(__name__)
+
+# Known tool names used to recover from multi-step list actions like
+# "Action: 1. system_health 2. service_restart ..."
+_KNOWN_TOOLS = [
+    "system_health", "database_status", "service_restart",
+    "service_logs", "service_config_update", "service_diagnostics",
+]
+
+
+class JSONReActOutputParser(ReActSingleInputOutputParser):
+    """ReAct output parser that normalises weaker-model output before parsing.
+
+    Fixes three common mistral:7b-instruct failure modes:
+    1. Tool name has parentheses:  `Action: system_health()`
+    2. Action is a numbered list:  `Action: 1. system_health 2. service_restart …`
+    3. Action Input has trailing prose after valid JSON:
+       `Action Input: {"service_name": "api-gateway"}. Once restarted …`
+    """
+
+    def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
+        # --- Fix 1: strip markdown + () from tool names ---
+        # Handles: ** `system_health` **()  →  system_health
+        #          `system_health`()         →  system_health
+        #          system_health()           →  system_health
+        text = re.sub(
+            r'^(Action:\s*)\*+\s*`?(\w+)`?\s*\*+\s*\(\)',
+            r'\1\2', text, flags=re.MULTILINE
+        )
+        text = re.sub(r'^(Action:\s*)`(\w+)`\s*\(\)', r'\1\2', text, flags=re.MULTILINE)
+        text = re.sub(r'^(Action:\s*)(\w+)\(\)', r'\1\2', text, flags=re.MULTILINE)
+        # Also strip markdown without parens: ** `system_health` **  →  system_health
+        text = re.sub(
+            r'^(Action:\s*)\*+\s*`(\w+)`\s*\*+',
+            r'\1\2', text, flags=re.MULTILINE
+        )
+        text = re.sub(r'^(Action:\s*)`(\w+)`', r'\1\2', text, flags=re.MULTILINE)
+
+        # --- Fix 2: numbered-list action → first valid tool name ---
+        list_match = re.search(
+            r'^Action:\s*(?:\d+\.\s*)(' + '|'.join(_KNOWN_TOOLS) + r')',
+            text, re.MULTILINE
+        )
+        if list_match:
+            tool = list_match.group(1)
+            text = re.sub(r'^Action:.*$', f'Action: {tool}', text, flags=re.MULTILINE)
+
+        result = super().parse(text)
+
+        # --- Fix 3: extract first JSON object from Action Input, drop trailing prose ---
+        if isinstance(result, AgentAction) and isinstance(result.tool_input, str):
+            stripped = result.tool_input.strip()
+            if stripped.startswith("{"):
+                try:
+                    parsed, _ = json.JSONDecoder().raw_decode(stripped)
+                    return AgentAction(result.tool, parsed, result.log)
+                except json.JSONDecodeError:
+                    pass
+        return result
+
 
 # Model configurations
 # Use OpenAI-compatible endpoints (/v1/chat/completions) for New Relic instrumentation
@@ -25,11 +88,13 @@ logger = logging.getLogger(__name__)
 OLLAMA_MODEL_A_URL = os.getenv("OLLAMA_MODEL_A_URL", "http://ollama-model-a:11434/v1")
 OLLAMA_MODEL_B_URL = os.getenv("OLLAMA_MODEL_B_URL", "http://ollama-model-b:11434/v1")
 MODEL_A_NAME = os.getenv("MODEL_A_NAME", "mistral:7b-instruct")
-MODEL_B_NAME = os.getenv("MODEL_B_NAME", "ministral-3:8b-instruct-2512-q8_0")
+MODEL_B_NAME = os.getenv("MODEL_B_NAME", "ministral-3:8b-instruct-2512-q4_K_M")
 
 # Agent execution limits (tunable for local vs cloud-hosted models)
 AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS", "10"))
-AGENT_MAX_EXECUTION_TIME = int(os.getenv("AGENT_MAX_EXECUTION_TIME", "300"))
+AGENT_MAX_EXECUTION_TIME = int(os.getenv("AGENT_MAX_EXECUTION_TIME", "600"))
+# Repair workflows execute exactly 3 tools; hard cap at 3 to prevent runaway loops
+REPAIR_MAX_ITERATIONS = 3
 
 
 class ModelRouter:
@@ -40,7 +105,7 @@ class ModelRouter:
     with their own LLM instances, callbacks, and metrics tracking.
     """
 
-    def __init__(self, prompt_template: PromptTemplate):
+    def __init__(self, prompt_template: PromptTemplate, max_iterations: int = AGENT_MAX_ITERATIONS):
         """
         Initialize model router with both agents.
 
@@ -63,9 +128,7 @@ class ModelRouter:
             base_url=OLLAMA_MODEL_A_URL,
             api_key="ollama",  # Ollama doesn't require real API key, but ChatOpenAI needs one
             temperature=0.1,  # Low temperature for deterministic tool calls
-            max_tokens=2048,  # Max output tokens
-            # Note: keep_alive is not supported via OpenAI-compatible API
-            # Models will auto-unload after default timeout (5 minutes)
+            max_tokens=1024,  # Allow room for multi-step generation; Fix 3 strips hallucinated observations
         )
 
         logger.info(f"Model B: {MODEL_B_NAME} at {OLLAMA_MODEL_B_URL}")
@@ -74,9 +137,7 @@ class ModelRouter:
             base_url=OLLAMA_MODEL_B_URL,
             api_key="ollama",  # Ollama doesn't require real API key, but ChatOpenAI needs one
             temperature=0.1,
-            max_tokens=2048,
-            # Note: keep_alive is not supported via OpenAI-compatible API
-            # Models will auto-unload after default timeout (5 minutes)
+            max_tokens=1024,  # Allow room for multi-step generation; Fix 3 strips hallucinated observations
         )
 
         # Create MCP tools (shared between agents)
@@ -89,13 +150,15 @@ class ModelRouter:
             self.model_a,
             MODEL_A_NAME,
             "a",
-            prompt_template
+            prompt_template,
+            max_iterations=max_iterations,
         )
         self.agent_b = self._create_agent(
             self.model_b,
             MODEL_B_NAME,
             "b",
-            prompt_template
+            prompt_template,
+            max_iterations=max_iterations,
         )
 
         logger.info("=" * 60)
@@ -107,7 +170,8 @@ class ModelRouter:
         llm: ChatOpenAI,
         model_name: str,
         model_variant: str,
-        prompt_template: PromptTemplate
+        prompt_template: PromptTemplate,
+        max_iterations: int = AGENT_MAX_ITERATIONS,
     ) -> AgentExecutor:
         """
         Create a ReAct agent executor.
@@ -130,10 +194,13 @@ class ModelRouter:
         llm_with_callbacks = llm.with_config(callbacks=[nr_callback])
 
         # Create ReAct agent with callback-enabled LLM
+        # Use JSONReActOutputParser so multi-arg tools (e.g. service_config_update)
+        # receive a dict instead of a raw string, avoiding pydantic validation errors.
         agent = create_react_agent(
             llm=llm_with_callbacks,
             tools=self.tools,
             prompt=prompt_template,
+            output_parser=JSONReActOutputParser(),
         )
 
         # Wrap in AgentExecutor
@@ -141,8 +208,8 @@ class ModelRouter:
             agent=agent,
             tools=self.tools,
             callbacks=[nr_callback],
-            handle_parsing_errors=True,  # Graceful fallback for parsing errors
-            max_iterations=AGENT_MAX_ITERATIONS,
+            handle_parsing_errors="Invalid format. Respond with ONLY:\nThought: All steps complete\nFinal Answer: [brief summary of what was done]",
+            max_iterations=max_iterations,
             max_execution_time=AGENT_MAX_EXECUTION_TIME,
             return_intermediate_steps=True,  # Capture tool execution traces
             verbose=True,  # Detailed logging
@@ -151,7 +218,7 @@ class ModelRouter:
 
         logger.info(
             f"Created agent executor for {model_variant}: "
-            f"max_iterations={AGENT_MAX_ITERATIONS}, timeout={AGENT_MAX_EXECUTION_TIME}s, tools={len(self.tools)}"
+            f"max_iterations={max_iterations}, timeout={AGENT_MAX_EXECUTION_TIME}s, tools={len(self.tools)}"
         )
 
         return agent_executor
@@ -193,13 +260,14 @@ class ModelRouter:
         return MODEL_A_NAME if model == "a" else MODEL_B_NAME
 
 
-# Global router instance (initialized by app.py)
+# Global router instances (initialized by app.py)
 _router = None
+_chat_router = None
 
 
 def init_router(prompt_template: PromptTemplate) -> ModelRouter:
     """
-    Initialize global model router.
+    Initialize global model router (for /repair endpoint).
 
     Args:
         prompt_template: System prompt template for agents
@@ -208,13 +276,28 @@ def init_router(prompt_template: PromptTemplate) -> ModelRouter:
         Initialized ModelRouter instance
     """
     global _router
-    _router = ModelRouter(prompt_template)
+    _router = ModelRouter(prompt_template, max_iterations=REPAIR_MAX_ITERATIONS)
     return _router
+
+
+def init_chat_router(prompt_template: PromptTemplate) -> ModelRouter:
+    """
+    Initialize global chat model router (for /chat endpoint).
+
+    Args:
+        prompt_template: System prompt template for chat agents
+
+    Returns:
+        Initialized ModelRouter instance
+    """
+    global _chat_router
+    _chat_router = ModelRouter(prompt_template)
+    return _chat_router
 
 
 def get_router() -> ModelRouter:
     """
-    Get global model router instance.
+    Get global model router instance (repair).
 
     Returns:
         ModelRouter instance
@@ -227,6 +310,23 @@ def get_router() -> ModelRouter:
             "ModelRouter not initialized. Call init_router() first."
         )
     return _router
+
+
+def get_chat_router() -> ModelRouter:
+    """
+    Get global chat model router instance.
+
+    Returns:
+        ModelRouter instance
+
+    Raises:
+        RuntimeError: If chat router not initialized
+    """
+    if _chat_router is None:
+        raise RuntimeError(
+            "Chat ModelRouter not initialized. Call init_chat_router() first."
+        )
+    return _chat_router
 
 
 async def run_agent_workflow(
@@ -271,6 +371,20 @@ async def run_agent_workflow(
 
         # Execute agent
         result = await agent.ainvoke({"input": prompt})
+
+        # Detect LangChain force-stop (max_iterations or max_execution_time reached).
+        # AgentExecutor does NOT raise an exception in this case — it returns silently
+        # with a special output string, making the timeout invisible to New Relic.
+        agent_output = result.get('output', '')
+        if 'Agent stopped due to iteration limit or time limit' in agent_output:
+            intermediate_steps = result.get('intermediate_steps', [])
+            if not intermediate_steps:
+                # Force-stopped with no tool calls at all — genuine failure
+                raise RuntimeError(f"Agent force-stopped (timeout or iteration limit): {agent_output}")
+            # Force-stopped after calling tools — the repair steps ran, synthesize a final answer
+            tool_calls = [step[0].tool for step in intermediate_steps]
+            agent_output = f"Completed {len(tool_calls)} step(s): {', '.join(tool_calls)}"
+            result['output'] = agent_output
 
         success = True
         latency = time.time() - start_time
@@ -328,6 +442,9 @@ async def run_agent_workflow(
         error_msg = str(e)
         metrics.record_request(success=False, latency=latency)
 
+        # Surface the error in New Relic error inbox
+        newrelic.agent.notice_error()
+
         # Generate and record negative feedback for errors
         rating, category, message = generate_feedback_rating(
             success=False,
@@ -353,6 +470,140 @@ async def run_agent_workflow(
         logger.error(
             f"[AGENT-WORKFLOW] Failed: model={model}, "
             f"error={type(e).__name__}: {e}",
+            exc_info=True
+        )
+
+        return {
+            'output': f"Error: {str(e)}",
+            'intermediate_steps': result.get('intermediate_steps', []) if result else [],
+            'model_name': model_name,
+            'model_variant': model,
+            'success': False,
+            'latency_seconds': latency,
+            'error': error_msg,
+        }
+
+
+async def run_chat_workflow(
+    model: Literal["a", "b"],
+    prompt: str
+) -> Dict[str, Any]:
+    """
+    Execute chat workflow using the chat router (CHAT_PROMPT_TEMPLATE).
+
+    Uses a separate router initialized with the chat prompt, which does NOT
+    force system_health on every request. This allows conversational questions
+    to be answered without triggering repair loops.
+
+    Args:
+        model: Model identifier ("a" or "b")
+        prompt: User message
+
+    Returns:
+        Same structure as run_agent_workflow
+    """
+    import newrelic.agent
+    from observability import generate_feedback_rating, record_feedback_event
+
+    router = get_chat_router()
+    agent = router.get_agent(model)
+    metrics = router.get_metrics(model)
+    model_name = router.get_model_name(model)
+
+    import time
+    start_time = time.time()
+    success = False
+    result = None
+    error_msg = None
+
+    trace_id = newrelic.agent.current_trace_id()
+
+    try:
+        logger.info(f"[CHAT-WORKFLOW] Starting with model {model} ({model_name})")
+        logger.info(f"[CHAT-WORKFLOW] Prompt: {prompt[:100]}...")
+
+        result = await agent.ainvoke({"input": prompt})
+
+        # Detect LangChain force-stop (max_iterations or max_execution_time reached).
+        # AgentExecutor does NOT raise an exception in this case — it returns silently
+        # with a special output string, making the timeout invisible to New Relic.
+        agent_output = result.get('output', '')
+        if 'Agent stopped due to iteration limit or time limit' in agent_output:
+            raise RuntimeError(f"Agent force-stopped (timeout or iteration limit): {agent_output}")
+
+        success = True
+        latency = time.time() - start_time
+        total_tokens = 0
+        tool_count = len(result.get('intermediate_steps', []))
+
+        metrics.record_request(success=True, latency=latency, tokens=total_tokens)
+
+        rating, category, message = generate_feedback_rating(
+            success=True,
+            latency_seconds=latency,
+            tool_count=tool_count,
+            error=None
+        )
+
+        if trace_id:
+            record_feedback_event(
+                trace_id=trace_id,
+                rating=rating,
+                category=category,
+                message=message,
+                metadata={
+                    'model_variant': model,
+                    'model_name': model_name,
+                    'tool_count': tool_count,
+                    'latency_seconds': round(latency, 2),
+                    'prompt_length': len(prompt)
+                }
+            )
+
+        logger.info(
+            f"[CHAT-WORKFLOW] Completed: model={model}, latency={latency:.2f}s, steps={tool_count}"
+        )
+
+        return {
+            'output': result.get('output', ''),
+            'intermediate_steps': result.get('intermediate_steps', []),
+            'model_name': model_name,
+            'model_variant': model,
+            'success': True,
+            'latency_seconds': latency,
+        }
+
+    except Exception as e:
+        latency = time.time() - start_time
+        error_msg = str(e)
+        metrics.record_request(success=False, latency=latency)
+
+        # Surface the error in New Relic error inbox
+        newrelic.agent.notice_error()
+
+        rating, category, message = generate_feedback_rating(
+            success=False,
+            latency_seconds=latency,
+            tool_count=0,
+            error=error_msg
+        )
+
+        if trace_id:
+            record_feedback_event(
+                trace_id=trace_id,
+                rating=rating,
+                category=category,
+                message=message,
+                metadata={
+                    'model_variant': model,
+                    'model_name': model_name,
+                    'error_type': type(e).__name__,
+                    'latency_seconds': round(latency, 2)
+                }
+            )
+
+        logger.error(
+            f"[CHAT-WORKFLOW] Failed: model={model}, error={type(e).__name__}: {e}",
             exc_info=True
         )
 

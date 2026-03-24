@@ -6,8 +6,8 @@ Autonomous reasoning engine powered by **LangChain** that executes multi-step sy
 
 - **Autonomous Tool Workflows**: Executes multi-step system operations through intelligent tool orchestration
 - **LangChain Integration**: Native LangChain agent with Ollama and MCP tool support
-- **Dual Model Support**: A/B testing with two LLM models (mistral:7b-instruct and ministral-3:8b-instruct-2512-q8_0)
-- **Backend Workflow Control**: Deterministic tool invocations via workflow parameters
+- **Dual Model Support**: A/B testing with two LLM models — Model A (mistral:7b-instruct, Efficient & Fast) and Model B (ministral-3:8b-instruct-2512-q4_K_M, Reliable & Accurate)
+- **Prompt-Guided Workflows**: Strongly guided tool sequences via workflow prompt parameters
 - **MCP Tool Calling**: Integrates with MCP server for generic system operation tools
 - **LLM Feedback Events**: Automatic binary rating generation with smart heuristics
 - **Token Counting**: tiktoken-based client-side token counting for accurate metrics
@@ -38,7 +38,7 @@ ai-agent/
 ├── mcp_tools.py            # MCP tool integration for LangChain
 ├── observability.py        # New Relic LLM feedback events & token counting
 ├── workflows.py            # Backend-controlled workflow definitions
-├── prompt_pool.py          # 18-prompt comprehensive testing pool
+├── prompt_pool.py          # 19-prompt comprehensive testing pool
 ├── cache.py                # Caching utilities for agent responses
 ├── models.py               # Pydantic models for requests/responses
 ├── prompts.py              # System prompts for tool execution and chat modes
@@ -70,7 +70,7 @@ Flask UI          AI Agent         LangChain        Ollama A/B       MCP Server
 2. **LangChain Agent**: ReAct pattern agent with tool calling and reasoning
 3. **MCP Tool Integration**: Native LangChain tool wrappers for MCP server calls
 4. **Observability Layer**: New Relic feedback events, token counting, trace correlation
-5. **Workflow Engine**: Backend-controlled tool invocations for deterministic testing
+5. **Workflow Engine**: Prompt-guided tool sequences for consistent demo workflows
 6. **Metrics Tracker**: In-memory storage for model performance metrics
 
 ## API Reference
@@ -78,19 +78,20 @@ Flask UI          AI Agent         LangChain        Ollama A/B       MCP Server
 ### Endpoints
 
 #### `POST /repair?model={a|b}&workflow={workflow_name}`
-Trigger tool execution workflow with specified model and optional backend-controlled workflow.
+Trigger tool execution workflow with specified model and optional prompt-guided workflow.
 
 **Query Parameters**:
-- `model` (required): `"a"` for mistral:7b-instruct or `"b"` for ministral-3:8b-instruct-2512-q8_0
-- `workflow` (optional): Backend workflow name (`minimal_single_tool`, `forced_full_repair`, etc.)
-  - If specified: Backend forces specific tool sequence (deterministic)
-  - If omitted: LLM decides tool usage (autonomous)
+
+- `model` (required): `"a"` for mistral:7b-instruct or `"b"` for ministral-3:8b-instruct-2512-q4_K_M
+- `workflow` (optional): Workflow name (`minimal_single_tool`, `forced_full_repair`, etc.)
+  - If specified: Prompt strongly guides the tool sequence
+  - If omitted: LLM decides tool usage autonomously
 
 **Response**:
 ```json
 {
   "success": true,
-  "model_used": "mistral:7b-instruct-v0.3",
+  "model_used": "mistral:7b-instruct",
   "latency_seconds": 2.45,
   "actions_taken": [
     "Checked system health status",
@@ -126,7 +127,7 @@ Interactive chat with the agent.
 ```json
 {
   "response": "The system is currently healthy. All services are running...",
-  "model_used": "mistral:7b-instruct-v0.3",
+  "model_used": "mistral:7b-instruct",
   "latency_seconds": 0.52
 }
 ```
@@ -154,33 +155,33 @@ Detailed agent status with model information.
   "models": {
     "model_a": {
       "url": "http://ollama-model-a:11434",
-      "name": "mistral:7b-instruct-v0.3"
+      "name": "mistral:7b-instruct"
     },
     "model_b": {
       "url": "http://ollama-model-b:11434",
-      "name": "ministral-3:8b-instruct-2512-q8_0"
+      "name": "ministral-3:8b-instruct-2512-q4_K_M"
     }
   },
   "mcp_server": "http://mcp-server:8002"
 }
 ```
 
-## Backend Workflow Control
+## Prompt-Guided Workflow Control
 
-The agent supports **deterministic tool invocations** via workflow parameters:
+The agent supports **prompt-guided tool sequences** via workflow parameters:
 
 ### Available Workflows
 
 | Workflow | Description | Tool Sequence |
 |----------|-------------|---------------|
 | `minimal_single_tool` | Single health check | `system_health` (1 call) |
-| `forced_full_repair` | Complete repair cycle | `system_health` → `service_restart` → `system_health` (3 calls) |
+| `forced_full_repair` | Complete repair cycle (3 steps) | `system_health` → `service_restart` (api-gateway) → `system_health` |
 | `repair_deterministic` | Conditional repair | Health check, diagnose if needed, restart, verify |
 | `repair_open_ended` | LLM-controlled | Agent decides tool sequence based on context |
 
 **Usage**:
 ```bash
-# Backend-controlled (deterministic)
+# Prompt-guided workflow
 curl -X POST "http://localhost:8001/repair?model=a&workflow=minimal_single_tool"
 
 # LLM-controlled (autonomous)
@@ -244,8 +245,8 @@ def token_count_callback(model: str, content: Any) -> int:
 ## Dependencies
 
 ### Upstream Services
-- **ollama-model-a** (Port 11434): Mistral 7B Instruct model for reliable reasoning
-- **ollama-model-b** (Port 11435): Ministral 3:8b q8_0 model for efficient reasoning
+- **ollama-model-a** (Port 11434): Mistral 7B Instruct — Efficient & Fast (~2s latency)
+- **ollama-model-b** (Port 11435): Ministral 8B q4_K_M — Reliable & Accurate (~5s latency)
 - **mcp-server** (Port 8002): Tool interface for system operations
 
 ### Downstream Services
@@ -269,8 +270,8 @@ pip install -r requirements.txt
 # Set environment variables
 export OLLAMA_MODEL_A_URL=http://localhost:11434
 export OLLAMA_MODEL_B_URL=http://localhost:11435
-export MODEL_A_NAME=mistral:7b-instruct-v0.3
-export MODEL_B_NAME=ministral-3:8b-instruct-2512-q8_0
+export MODEL_A_NAME=mistral:7b-instruct
+export MODEL_B_NAME=ministral-3:8b-instruct-2512-q4_K_M
 export MCP_SERVER_URL=http://localhost:8002
 export AGENT_PORT=8001
 
@@ -307,8 +308,8 @@ curl http://localhost:8001/status
 |----------|----------|---------|-------------|
 | `OLLAMA_MODEL_A_URL` | Yes | - | URL for Model A Ollama instance |
 | `OLLAMA_MODEL_B_URL` | Yes | - | URL for Model B Ollama instance |
-| `MODEL_A_NAME` | Yes | - | Model name (e.g., mistral:7b-instruct-v0.3) |
-| `MODEL_B_NAME` | Yes | - | Model name (e.g., ministral-3:8b-instruct-2512-q8_0) |
+| `MODEL_A_NAME` | Yes | - | Model name (e.g., mistral:7b-instruct) |
+| `MODEL_B_NAME` | Yes | - | Model name (e.g., ministral-3:8b-instruct-2512-q4_K_M) |
 | `MCP_SERVER_URL` | Yes | - | MCP server URL for tool calling |
 | `AGENT_PORT` | No | 8001 | Port to run agent service |
 | `NEW_RELIC_LICENSE_KEY` | No | - | New Relic ingest license key |

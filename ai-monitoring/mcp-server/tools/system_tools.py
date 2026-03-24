@@ -14,6 +14,24 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# Track last restart time per service — restarted services stay healthy for 120s
+_last_restart_time: dict = {}
+
+
+def _normalize_service_name(raw: str) -> str:
+    """
+    Normalize service_name from LangChain ReAct parser.
+    The parser sometimes passes the full JSON action input string
+    (e.g. '{"service_name": "api-gateway"}') instead of the bare value.
+    """
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict) and "service_name" in parsed:
+            return parsed["service_name"]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return raw
+
 
 def check_system_health() -> str:
     """
@@ -23,17 +41,23 @@ def check_system_health() -> str:
     """
     logger.info("Tool called: check_system_health")
 
+    # api-gateway stays healthy for 120s after a restart, then 50% chance of degrading
+    recently_restarted = (time.time() - _last_restart_time.get("api-gateway", 0)) < 120
+    api_gateway_degraded = False if recently_restarted else random.random() < 0.3
+    api_gateway_status = "degraded" if api_gateway_degraded else "running"
+    overall_status = "degraded" if api_gateway_degraded else "healthy"
+
     return json.dumps({
-        "status": "healthy",
+        "status": overall_status,
         "timestamp": datetime.now().isoformat(),
         "services": [
-            {"name": "api-gateway", "status": "running", "cpu": 45, "memory": 62, "uptime": "3d 14h"},
+            {"name": "api-gateway", "status": api_gateway_status, "cpu": random.randint(70, 95) if api_gateway_degraded else 45, "memory": 62, "uptime": "3d 14h"},
             {"name": "auth-service", "status": "running", "cpu": 23, "memory": 48, "uptime": "5d 2h"},
             {"name": "database", "status": "running", "cpu": 67, "memory": 81, "uptime": "12d 8h"},
             {"name": "cache-service", "status": "running", "cpu": 12, "memory": 34, "uptime": "8d 16h"}
         ],
         "system_metrics": {
-            "cpu_usage": 52,
+            "cpu_usage": random.randint(75, 90) if api_gateway_degraded else 52,
             "memory_usage": 68,
             "disk_usage": 42,
             "network_throughput_mbps": 145.7
@@ -82,7 +106,10 @@ def restart_service(service_name: str) -> str:
 
     Simulates a service restart with appropriate delay.
     """
+    service_name = _normalize_service_name(service_name)
     logger.info(f"Tool called: restart_service({service_name})")
+
+    _last_restart_time[service_name] = time.time()
 
     return json.dumps({
         "status": "success",
