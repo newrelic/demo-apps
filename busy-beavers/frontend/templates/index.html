@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Busy Beavers</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+  <header>
+    <h1><span class="beaver">🦫</span> Busy Beavers</h1>
+    <p>New Relic Demo — Load Generator</p>
+  </header>
+
+  <div class="dam-grid">
+
+    <!-- Normal Transaction -->
+    <button
+      id="btn-transaction"
+      class="log-btn transaction"
+      onclick="callApi('/api/transaction', 'Normal transaction')"
+    >
+      <span class="icon">🦫</span>
+      <span class="label">Normal Txn</span>
+    </button>
+
+    <!-- Trigger Error -->
+    <button
+      id="btn-error"
+      class="log-btn error"
+      onclick="callApi('/api/error', 'Error triggered')"
+    >
+      <span class="icon">🌊</span>
+      <span class="label">Error</span>
+    </button>
+
+    <!-- Change Marker -->
+    <button
+      id="btn-change-marker"
+      class="log-btn change-marker"
+      onclick="callApi('/api/change-marker', 'Change marker created')"
+    >
+      <span class="icon">🌲</span>
+      <span class="label">Change Marker</span>
+    </button>
+
+    <!-- Null / Rage-click target -->
+    <button
+      id="btn-null"
+      class="log-btn null-action"
+      onclick="callNull()"
+    >
+      <span class="icon">🪵</span>
+      <span class="label">Null</span>
+    </button>
+
+  </div>
+
+  <div id="status-toast"></div>
+
+  <footer>busy-beavers &mdash; lights up charts, nothing more</footer>
+
+  <script>
+    const toast = document.getElementById('status-toast');
+
+    function showToast(message, type) {
+      toast.textContent = message;
+      toast.className = type;
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => { toast.className = ''; }, 4000);
+    }
+
+    function noticeError(err, attrs) {
+      if (window.newrelic) {
+        window.newrelic.noticeError(err, attrs);
+      }
+    }
+
+    async function callApi(endpoint, label) {
+      console.log(`[busy-beavers] ${label}: sending request to ${endpoint}`);
+      try {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          const detail = data.task_id ? ` (${data.task_id})` : (data.tracking_id ? ` (${data.tracking_id})` : '');
+          console.log(`[busy-beavers] ${label}: success`, data);
+          showToast(`✓ ${label}${detail}`, 'success');
+        } else {
+          const errMsg = data.error || resp.statusText;
+          console.error(`[busy-beavers] ${label}: server error ${resp.status} — ${errMsg}`, data);
+          noticeError(new Error(`${label}: ${errMsg}`), { endpoint, status: resp.status });
+          showToast(`✗ ${label}: ${errMsg}`, 'error');
+        }
+      } catch (err) {
+        console.error(`[busy-beavers] ${label}: request failed —`, err);
+        noticeError(err, { endpoint, label });
+        showToast(`✗ ${label}: ${err.message}`, 'error');
+      }
+    }
+
+    function callNull() {
+      // Intentionally no visual feedback — rage-click target
+      console.log('[busy-beavers] null: no-op click');
+      fetch('/api/null', { method: 'POST' }).catch(() => {});
+    }
+
+    console.log('[busy-beavers] UI ready');
+  </script>
+
+</body>
+</html>

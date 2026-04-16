@@ -1,0 +1,190 @@
+/* ============================================================
+   Busy Beavers — Dam & Forest Theme
+   ============================================================ */
+
+:root {
+  --bark-dark:    #3E2723;
+  --bark:         #5D4037;
+  --bark-mid:     #795548;
+  --bark-light:   #A1887F;
+  --log-tan:      #8D6E63;
+  --forest-dark:  #1B5E20;
+  --forest:       #388E3C;
+  --forest-light: #66BB6A;
+  --water:        #1565C0;
+  --water-light:  #42A5F5;
+  --mud:          #4E342E;
+  --cream:        #FFF8F0;
+  --amber:        #FF8F00;
+  --white:        #FFFFFF;
+}
+
+/* ---- Reset & base ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: var(--cream);
+  background-color: var(--bark-dark);
+  background-image:
+    /* water ripple at bottom */
+    radial-gradient(ellipse at 50% 110%, rgba(21,101,192,0.35) 0%, transparent 60%),
+    /* canopy light from top */
+    radial-gradient(ellipse at 50% -10%, rgba(56,142,60,0.25) 0%, transparent 55%),
+    /* wood-grain lines */
+    repeating-linear-gradient(
+      175deg,
+      transparent 0px,
+      transparent 18px,
+      rgba(255,255,255,0.025) 18px,
+      rgba(255,255,255,0.025) 19px
+    );
+}
+
+/* ---- Header ---- */
+header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+header h1 {
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+header h1 .beaver { font-size: 2.6rem; }
+
+header p {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--bark-light);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---- Dam log grid ---- */
+.dam-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  width: min(520px, 90vw);
+}
+
+/* ---- Log buttons ---- */
+.log-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.6rem 1rem;
+  border: none;
+  border-radius: 18px 18px 14px 14px; /* hewn log ends */
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--white);
+  transition: transform 0.1s, box-shadow 0.15s, filter 0.15s;
+  outline: none;
+  overflow: hidden;
+
+  /* wood-grain texture */
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255,255,255,0) 0px,
+    rgba(255,255,255,0) 6px,
+    rgba(255,255,255,0.04) 6px,
+    rgba(255,255,255,0.04) 7px
+  );
+}
+
+/* End-grain rings */
+.log-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at 50% 50%,
+    rgba(255,255,255,0.08) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+.log-btn:hover  { transform: translateY(-3px); filter: brightness(1.12); }
+.log-btn:active { transform: translateY(1px);  filter: brightness(0.92); }
+
+/* Individual log colours */
+.log-btn.transaction {
+  background-color: var(--bark-mid);
+  box-shadow: 0 4px 0 var(--bark-dark), 0 6px 18px rgba(0,0,0,0.35);
+}
+.log-btn.error {
+  background-color: #B71C1C;
+  box-shadow: 0 4px 0 #7B0000, 0 6px 18px rgba(0,0,0,0.35);
+}
+.log-btn.change-marker {
+  background-color: var(--forest);
+  box-shadow: 0 4px 0 var(--forest-dark), 0 6px 18px rgba(0,0,0,0.35);
+}
+.log-btn.null-action {
+  background-color: var(--mud);
+  box-shadow: 0 4px 0 #1A1A1A, 0 6px 18px rgba(0,0,0,0.35);
+}
+
+.log-btn .icon { font-size: 2rem; line-height: 1; }
+.log-btn .label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.07em; }
+
+/* ---- Status toast ---- */
+#status-toast {
+  margin-top: 2rem;
+  min-height: 2.2rem;
+  width: min(520px, 90vw);
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  transition: opacity 0.3s;
+  opacity: 0;
+}
+
+#status-toast.success {
+  background: rgba(56,142,60,0.25);
+  border: 1px solid var(--forest-light);
+  color: var(--forest-light);
+  opacity: 1;
+}
+
+#status-toast.error {
+  background: rgba(183,28,28,0.25);
+  border: 1px solid #EF9A9A;
+  color: #EF9A9A;
+  opacity: 1;
+}
+
+#status-toast.info {
+  background: rgba(21,101,192,0.25);
+  border: 1px solid var(--water-light);
+  color: var(--water-light);
+  opacity: 1;
+}
+
+/* ---- Footer ---- */
+footer {
+  margin-top: 3rem;
+  font-size: 0.75rem;
+  color: var(--bark-light);
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
