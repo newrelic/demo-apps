@@ -1,0 +1,57 @@
+# ─── New Relic Java agent configuration ─────────────────────────────────────
+# Environment variables set in docker-compose.yml always override settings here.
+# Key vars already set: NEW_RELIC_LICENSE_KEY, NEW_RELIC_APP_NAME.
+# This file controls the settings that have no direct env-var equivalent.
+
+common: &default_settings
+
+  # ── Distributed tracing ──────────────────────────────────────────────────
+  distributed_tracing:
+    enabled: true
+
+  # ── Logs in context ──────────────────────────────────────────────────────
+  application_logging:
+    enabled: true
+    forwarding:
+      enabled: true
+      max_samples_stored: 10000
+    metrics:
+      enabled: true
+    local_decorating:
+      enabled: true
+
+  allow_all_headers: true
+
+  attributes:
+    exclude:
+      - request.headers.cookie
+      - request.headers.authorization
+      - request.headers.proxyAuthorization
+      - 'request.headers.setCookie*'
+      - 'request.headers.x*'
+      - response.headers.cookie
+      - response.headers.authorization
+      - response.headers.proxyAuthorization
+      - 'response.headers.setCookie*'
+      - 'response.headers.x*'
+
+  # ── Oracle DB entity linking (optional, highly encouraged) ───────────────
+  # When enabled, the agent prepends this service's entity GUID as a comment
+  # on every SQL statement:  /*nr_service_guid=<guid>*/ SELECT ...
+  # New Relic's Oracle DB receiver reads that comment from V$SQL and draws a
+  # "Service → Database" relationship, linking APM traces to DB query data.
+  #
+  # To enable:
+  #   1. Let the stack run for ~5 min so this service appears in New Relic APM.
+  #   2. Uncomment the `transaction_tracer` block below.
+  #   3. Restart: docker compose restart backend frontend
+  #   4. Allow 5–10 min for the relationship to appear in the NR entity map.
+  #
+  # transaction_tracer:
+  #   sql_metadata_comments: "nr_service_guid"
+
+development:
+  <<: *default_settings
+
+production:
+  <<: *default_settings

@@ -189,3 +189,11 @@ web/handlers/*.zip
 #-------------------------------------------------------------------------------
 # Database schema (excluded from global *.sql ignore)
 !bad-apples/database/init.sql
+
+# ReliPeople Oracle DB demo init scripts
+!oracle-db/oracle/init/01-schema.sql
+!oracle-db/oracle/init/02-seed.sql
+
+# NR Java agent config — copy from .example and edit locally (gitignored to prevent committing entity-linking changes)
+oracle-db/backend/newrelic.yml
+oracle-db/frontend/newrelic.yml

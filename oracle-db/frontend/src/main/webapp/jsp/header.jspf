@@ -1,0 +1,176 @@
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ReliPeople HR Portal</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f4f4f4;
+            color: #222;
+        }
+        header.topnav {
+            background: #1a3a5c;
+            color: white;
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        header.topnav .logo {
+            font-size: 22px;
+            font-weight: bold;
+            margin-right: 40px;
+            letter-spacing: 0.5px;
+        }
+        header.topnav nav a {
+            color: white;
+            text-decoration: none;
+            margin-right: 22px;
+            font-size: 14px;
+            opacity: 0.85;
+            transition: opacity 0.15s;
+        }
+        header.topnav nav a:hover { opacity: 1; }
+        main {
+            max-width: 1300px;
+            margin: 28px auto;
+            padding: 0 24px;
+        }
+        h1 { color: #1a3a5c; margin-top: 0; }
+        h2 { color: #1a3a5c; }
+        .card {
+            background: white;
+            border-radius: 6px;
+            padding: 22px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        table th {
+            background: #e9eef4;
+            color: #1a3a5c;
+            text-align: left;
+            padding: 12px 14px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        table td {
+            padding: 11px 14px;
+            border-top: 1px solid #eee;
+            font-size: 14px;
+        }
+        table tr:hover td { background: #fafbfc; }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .badge-approved { background: #d6f5dc; color: #1f7a3a; }
+        .badge-pending  { background: #fff4cc; color: #8a6a00; }
+        .badge-rejected { background: #fde0e0; color: #a61f1f; }
+        .badge-warn     { background: #ffe8cc; color: #8a4500; }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 6px;
+            padding: 22px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-left: 4px solid #1a3a5c;
+        }
+        .stat-label { color: #666; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 36px; font-weight: 700; color: #1a3a5c; margin-top: 6px; }
+        .search-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .search-row input[type=text] {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .search-row button {
+            padding: 10px 22px;
+            background: #1a3a5c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .search-row button:hover { background: #234b76; }
+        .emp-link { color: #1a3a5c; text-decoration: none; font-weight: 600; }
+        .emp-link:hover { text-decoration: underline; }
+        .error-msg {
+            background: #fde0e0;
+            color: #a61f1f;
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 18px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        .rollup-row td {
+            background: #f0f4f8 !important;
+            font-weight: bold;
+        }
+        .page-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            background: #ffe8cc;
+            color: #8a4500;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body>
+<header class="topnav">
+    <div class="logo">ReliPeople</div>
+    <nav>
+        <a href="/" data-testid="nav-dashboard">Dashboard</a>
+        <a href="/employees" data-testid="nav-employees">Employees</a>
+        <a href="/reports/payroll" data-testid="report-payroll">Payroll</a>
+        <a href="/reports/departments" data-testid="report-departments">Departments</a>
+        <a href="/reports/performance" data-testid="report-performance">Performance</a>
+        <a href="/reports/leave-backlog" data-testid="report-leave-backlog">Leave Backlog</a>
+        <a href="/reports/salary-progression" data-testid="report-salary-progression">Salary Progression</a>
+        <a href="/leaves" data-testid="nav-leaves">Leaves</a>
+    </nav>
+</header>
+<main>
+<c:if test="${not empty error}">
+    <div class="error-msg">${error}</div>
+</c:if>
