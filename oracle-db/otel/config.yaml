@@ -1,0 +1,122 @@
+extensions:
+  health_check:
+    endpoint: "0.0.0.0:13133"
+
+receivers:
+  # CDB-level metrics (sessions, SGA, resource limits, tablespaces, containers, etc.)
+  oracledb/cdb:
+    endpoint: "oracle:1521"
+    username: "c##nrdot"
+    password: "${env:ORACLE_NRDOT_PASSWORD}"
+    service: "FREE"
+    collection_interval: 30s
+    timeout: 30s
+    enable_tablespace_scraper: true
+    enable_core_scraper: true
+    enable_system_scraper: true
+    enable_connection_scraper: true
+    enable_container_scraper: true
+    enable_database_info_scraper: true
+
+  # PDB-level metrics + query monitoring (threshold 1ms = capture all queries)
+  oracledb/pdb:
+    endpoint: "oracle:1521"
+    username: "c##nrdot"
+    password: "${env:ORACLE_NRDOT_PASSWORD}"
+    service: "FREEPDB1"
+    collection_interval: 30s
+    timeout: 30s
+    pdb_services: ["ALL"]
+    enable_pdb_scraper: true
+    enable_query_monitoring: true
+    query_monitoring_response_time_threshold: 1
+    query_monitoring_count_threshold: 30
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+
+  batch:
+
+  transform/clear_metadata:
+    metric_statements:
+      - context: metric
+        statements:
+          - set(metric.description, "")
+          - set(metric.unit, "")
+
+  filter/exec_plan_and_query_details_include:
+    metrics:
+      include:
+        match_type: strict
+        metric_names:
+          - oracledb.execution_plan
+          - oracledb.slow_queries.query_details
+
+  filter/exec_plan_and_query_details_exclude:
+    metrics:
+      exclude:
+        match_type: strict
+        metric_names:
+          - oracledb.execution_plan
+          - oracledb.slow_queries.query_details
+
+  # Convert cumulative oracle connection counters to delta for NR ingest
+  cumulativetodelta/oracle:
+    include:
+      match_type: strict
+      metrics:
+        - oracledb.connection.bytes_received
+        - oracledb.connection.bytes_sent
+        - oracledb.connection.execute_count
+        - oracledb.connection.logons_cumulative
+        - oracledb.connection.parse_count_hard
+        - oracledb.connection.parse_count_total
+        - oracledb.connection.sqlnet_roundtrips
+        - oracledb.connection.user_commits
+        - oracledb.connection.user_rollbacks
+
+  resourcedetection/db_safe:
+    detectors: ["system"]
+    override: false
+    system:
+      hostname_sources: ["os"]
+      resource_attributes:
+        host.id:
+          enabled: true
+
+connectors:
+  metricsaslogs:
+    include_resource_attributes: true
+    include_scope_info: true
+
+exporters:
+  otlp:
+    # gRPC exporter requires host:port — no scheme prefix.
+    # EU accounts: otlp.eu01.nr-data.net:443
+    endpoint: "${env:NR_OTLP_ENDPOINT:-otlp.nr-data.net:443}"
+    headers:
+      api-key: "${env:NEW_RELIC_LICENSE_KEY}"
+    compression: gzip
+    tls:
+      insecure: false
+
+service:
+  extensions: [health_check]
+  pipelines:
+    # Oracle DB metrics (standard)
+    metrics/oracledb:
+      receivers: [oracledb/cdb, oracledb/pdb]
+      processors: [memory_limiter, resourcedetection/db_safe, cumulativetodelta/oracle, batch, transform/clear_metadata, filter/exec_plan_and_query_details_exclude]
+      exporters: [otlp]
+
+    # Execution plan + slow query details → NR log events
+    metrics/exec_plan_and_query_details_to_logs:
+      receivers: [oracledb/cdb, oracledb/pdb]
+      processors: [filter/exec_plan_and_query_details_include]
+      exporters: [metricsaslogs]
+    logs/oracledb:
+      receivers: [metricsaslogs]
+      processors: [memory_limiter, resourcedetection/db_safe, batch]
+      exporters: [otlp]

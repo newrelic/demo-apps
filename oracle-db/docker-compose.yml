@@ -1,0 +1,130 @@
+name: oracle-db
+
+services:
+  oracle:
+    image: gvenzl/oracle-free:latest
+    container_name: relipeople-oracle
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-ReliPeople1}
+      APP_USER: ${ORACLE_APP_USER:-relipeople}
+      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD:-ReliPeople1}
+      ORACLE_NRDOT_PASSWORD: ${ORACLE_NRDOT_PASSWORD:-NrdotMonitor1}
+    ports:
+      - "${ORACLE_PORT:-1521}:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+      - ./oracle/init:/container-entrypoint-initdb.d:ro
+      - ./oracle/healthcheck.sh:/usr/local/bin/oracle-healthcheck.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "sh /usr/local/bin/oracle-healthcheck.sh"]
+      interval: 30s
+      timeout: 15s
+      retries: 30
+      start_period: 600s
+    networks:
+      - relipeople-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: relipeople-backend
+    environment:
+      - SERVER_PORT=8080
+      - ORACLE_HOST=oracle
+      - ORACLE_PORT=1521
+      - ORACLE_SERVICE=FREEPDB1
+      - ORACLE_USER=${ORACLE_APP_USER:-relipeople}
+      - ORACLE_PASSWORD=${ORACLE_APP_PASSWORD:-ReliPeople1}
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-}
+      - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME_BACKEND:-relipeople_backend}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      oracle:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - relipeople-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: relipeople-frontend
+    environment:
+      - BACKEND_URL=http://backend:8080
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-}
+      - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME_FRONTEND:-relipeople_frontend}
+    ports:
+      - "${FRONTEND_PORT:-8090}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    networks:
+      - relipeople-network
+
+  loadgen:
+    build:
+      context: ./loadgen
+      dockerfile: Dockerfile
+    container_name: relipeople-loadgen
+    environment:
+      - FRONTEND_URL=http://frontend:8080
+      - LOADGEN_USERS=${LOADGEN_USERS:-2}
+      - LOADGEN_INTERVAL=${LOADGEN_INTERVAL:-8}
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks:
+      - relipeople-network
+    restart: unless-stopped
+
+  otel-collector:
+    build:
+      context: ./otel
+      dockerfile: Dockerfile
+    container_name: relipeople-nrdot
+    environment:
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NR_OTLP_ENDPOINT=${NR_OTLP_ENDPOINT:-otlp.nr-data.net:443}
+      - ORACLE_NRDOT_PASSWORD=${ORACLE_NRDOT_PASSWORD:-NrdotMonitor1}
+      - INTERNAL_TELEMETRY_NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - INTERNAL_TELEMETRY_SERVICE_NAME=${NRDOT_SERVICE_NAME:-relipeople-nrdot}
+      - INTERNAL_TELEMETRY_METRICS_LEVEL=${INTERNAL_TELEMETRY_METRICS_LEVEL:-normal}
+    volumes:
+      - ./otel/config.yaml:/etc/nrdot-collector-host/config.yaml:ro
+      - ./otel/internal-telemetry.yaml:/etc/nrdot-collector-host/internal-telemetry.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:13133/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      oracle:
+        condition: service_healthy
+    networks:
+      - relipeople-network
+    restart: unless-stopped
+
+networks:
+  relipeople-network:
+    driver: bridge
+    name: relipeople-network
+
+volumes:
+  oracle-data:
+    name: relipeople-oracle-data
