@@ -145,6 +145,7 @@ terraform.tfvars
 # Data Files
 #-------------------------------------------------------------------------------
 *.sql
+!oracle-db/oracle/init/03-monitoring-user.sql
 *.sqlite
 *.db
 
