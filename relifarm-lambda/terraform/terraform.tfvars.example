@@ -1,0 +1,99 @@
+# =============================================================================
+# ReliFarm — Terraform variable template (AWS DEPLOY PATH ONLY)
+#
+# THIS FILE IS FOR `terraform apply`. The Docker Compose local-dev path uses
+# `../.env` instead — the two files are independent.
+#
+# Copy to `terraform.tfvars` and fill in real values. NEVER commit
+# `terraform.tfvars` (it's gitignored).
+# =============================================================================
+
+
+# =============================================================================
+# === REQUIRED ================================================================
+# Fill in every value in this block. Most will fail Terraform's input
+# validation if left as placeholders.
+# =============================================================================
+
+# AWS region.
+# Must be a region where AWS App Runner is available:
+#   us-east-1, us-east-2, us-west-2, eu-central-1, eu-west-1,
+#   ap-northeast-1, ap-northeast-2, ap-southeast-1, ap-southeast-2
+aws_region = "us-east-1"
+
+# New Relic credentials (see README → "Get your New Relic credentials").
+new_relic_account_id   = 1234567
+new_relic_api_key      = "NRAK-xxxxxxxxxxxxxxxxxxxxxxxx"
+new_relic_license_key  = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxNRAL"
+new_relic_region       = "US"   # "US" or "EU"
+
+# Resource name prefix (lets multiple engineers share one AWS account).
+name_prefix = "relifarm"
+
+
+# =============================================================================
+# === ADVANCED ================================================================
+# Everything below this line is optional. Sensible defaults are set in
+# `variables.tf`. Uncomment + override only when you have a specific reason.
+# Leave the whole section commented for the standard demo path.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# AWS named profile.
+# Leave commented to use the default credential chain (env vars / `[default]`
+# profile / SSO / instance metadata). Set to a named profile only if you
+# want it pinned in tfvars rather than via `AWS_PROFILE=…` in your shell.
+# When set here, Terraform also exports it as AWS_PROFILE for the docker /
+# aws CLI subprocess that pushes the core-engine image to ECR.
+# ---------------------------------------------------------------------------
+# aws_profile = "my-profile"
+
+# ---------------------------------------------------------------------------
+# Sizing knobs.
+# ---------------------------------------------------------------------------
+# core_engine_image_tag         = "latest"
+# core_engine_app_runner_cpu    = "1024"   # 1 vCPU
+# core_engine_app_runner_memory = "2048"   # MB
+# db_instance_class             = "db.t4g.micro"
+# db_allocated_storage          = 20
+
+# ---------------------------------------------------------------------------
+# Database backend.
+# Default = RDS Postgres. Flip this to true ONLY if your account denies
+# rds:CreateDBInstance via an SCP — Terraform will then self-host Postgres
+# on a t4g.micro EC2 instance instead. See trade-offs in
+# docs/aws-advanced.md → "EC2 Postgres fallback".
+# ---------------------------------------------------------------------------
+# use_ec2_postgres            = true
+# ec2_postgres_instance_type  = "t4g.micro"
+
+# ---------------------------------------------------------------------------
+# NR Lambda layer source.
+# Default = "pinned" — references NR's cross-account layer ARN at the
+# version pinned in new_relic_lambda_layer_version. Every plan checks NR's
+# index and warns loudly if the pin lags behind the latest.
+#
+# Switch to "auto-latest" to always use the most recent published version
+# (HTTP fetch from NR's index at plan time).
+#
+# Switch to "local" to upload a downloaded layer zip into your own account
+# as a private LayerVersion — workaround for SCPs that deny cross-account
+# lambda:GetLayerVersion. Requires lambdas/newrelic-layer.zip on disk; see
+# docs/aws-advanced.md → "Locally-bundled NR Lambda layer" for the download.
+# ---------------------------------------------------------------------------
+# nr_layer_source         = "auto-latest"
+# nr_layer_source         = "local"
+# local_nr_layer_zip_path = "../lambdas/newrelic-layer.zip"
+
+# ---------------------------------------------------------------------------
+# Custom domain.
+# Default leaves the dashboard at the auto-assigned *.cloudfront.net URL.
+# To map your own domain instead, set the variables below. See
+# docs/aws-advanced.md → "Optional: custom domain" for Route53 vs. external
+# DNS workflows.
+# ---------------------------------------------------------------------------
+# enable_custom_domain   = true
+# custom_domain_name     = "dash.example.com"
+# api_custom_domain_name = "api.example.com"   # optional; omit to leave API Gateway on its *.execute-api URL
+# dns_provider           = "route53"   # "route53" or "external"
+# route53_zone_id        = "Z01234567ABCDEFGHIJKL"   # required when dns_provider = "route53"

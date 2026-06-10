@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: relifarm-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - relifarm-pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  core-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: relifarm-core-engine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      SIMULATION_INTERVAL_SECONDS: ${SIMULATION_INTERVAL_SECONDS:-5}
+      # New Relic
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME:-relifarm-core-engine}
+      NEW_RELIC_LOG_LEVEL: ${NEW_RELIC_LOG_LEVEL:-info}
+      NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: "true"
+      NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED: "true"
+    ports:
+      - "${CORE_ENGINE_PORT:-8000}:8000"
+
+volumes:
+  relifarm-pgdata:

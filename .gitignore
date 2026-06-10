@@ -198,3 +198,20 @@ web/handlers/*.zip
 # NR Java agent config — copy from .example and edit locally (gitignored to prevent committing entity-linking changes)
 oracle-db/backend/newrelic.yml
 oracle-db/frontend/newrelic.yml
+
+#-------------------------------------------------------------------------------
+# ReliFarm Files
+#-------------------------------------------------------------------------------
+# Schema init (excluded from global *.sql ignore)
+!relifarm-lambda/core-engine/db/init.sql
+
+# Lambda build artifacts (the .zip pattern below is global; explicitly note here)
+relifarm-lambda/build/
+relifarm-lambda/lambdas/**/package/
+relifarm-lambda/lambdas/**/*.zip
+
+# Locally-downloaded NR Python Lambda layer zip (used by the nr_layer_source = "local"
+# workaround for accounts whose SCP denies cross-account lambda:GetLayerVersion).
+# Multi-MB binary; does not belong in source. Already covered by the *.zip glob
+# above, but called out here for discoverability.
+relifarm-lambda/lambdas/newrelic-layer.zip
