@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReliFarm — Operations Dashboard</title>
+
+    <!--
+        New Relic Browser Agent
+        Terraform replaces the placeholder block below with the rendered
+        loader from the `newrelic_browser_application` resource.
+    -->
+    <!-- NEW_RELIC_BROWSER_SNIPPET_START -->
+    %%NEW_RELIC_BROWSER_SNIPPET%%
+    <!-- NEW_RELIC_BROWSER_SNIPPET_END -->
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark">▲</span>
+            <span class="brand-name">ReliFarm</span>
+            <span class="brand-tag">Operations Dashboard</span>
+        </div>
+        <div class="status-pill" id="connectionStatus">connecting…</div>
+    </header>
+
+    <main>
+        <section class="panel kpi-row">
+            <div class="kpi"><span class="kpi-label">Avg moisture</span><span class="kpi-value" id="kpiMoisture">—</span></div>
+            <div class="kpi"><span class="kpi-label">Avg soil temp</span><span class="kpi-value" id="kpiTemp">—</span></div>
+            <div class="kpi"><span class="kpi-label">Active valves</span><span class="kpi-value" id="kpiValves">—</span></div>
+            <div class="kpi"><span class="kpi-label">Tractors deployed</span><span class="kpi-value" id="kpiTractors">—</span></div>
+        </section>
+
+        <section class="panel">
+            <h2>Sectors</h2>
+            <table id="sectorTable">
+                <thead>
+                    <tr>
+                        <th>Sector</th>
+                        <th>Crop</th>
+                        <th>Area (ha)</th>
+                        <th>Moisture %</th>
+                        <th>Temp °C</th>
+                        <th>Valve</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+
+        <section class="panel two-col">
+            <div>
+                <h2>Tractors</h2>
+                <table id="tractorTable">
+                    <thead>
+                        <tr><th>ID</th><th>Lat</th><th>Lon</th><th>Fuel %</th><th>Status</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div>
+                <h2>Recent irrigation executions</h2>
+                <table id="executionTable">
+                    <thead>
+                        <tr><th>When</th><th>Sector</th><th>By</th><th>Yield</th><th>Volume L</th><th>Dur s</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Build-time substitutions handled by Terraform.
+        window.RELIFARM_CONFIG = {
+            coreEngineUrl:     "%%CORE_ENGINE_URL%%",
+            yieldForecastUrl:  "%%YIELD_FORECAST_URL%%"
+        };
+    </script>
+    <script src="app.js"></script>
+</body>
+</html>

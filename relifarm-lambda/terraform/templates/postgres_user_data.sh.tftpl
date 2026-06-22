@@ -1,0 +1,60 @@
+#!/bin/bash
+# =============================================================================
+# Cloud-init user-data for the EC2 Postgres workaround path.
+# Runs once on first boot. Idempotent guards make re-runs safe (e.g., when
+# user_data_replace_on_change replaces the instance after a script edit).
+# =============================================================================
+set -euxo pipefail
+
+dnf install -y postgresql16-server postgresql16
+
+if [ ! -s /var/lib/pgsql/data/PG_VERSION ]; then
+  /usr/bin/postgresql-setup --initdb
+fi
+
+# Listen on all interfaces; the security group is the actual access boundary.
+sed -i "s/^#\?listen_addresses.*/listen_addresses = '*'/" /var/lib/pgsql/data/postgresql.conf
+
+# Allow md5-password connections from inside the VPC. vpc_cidr comes from
+# data.aws_vpc.default.cidr_block via templatefile().
+HBA_RULE="host all all ${vpc_cidr} md5"
+if ! grep -qF "$HBA_RULE" /var/lib/pgsql/data/pg_hba.conf; then
+  echo "$HBA_RULE" >> /var/lib/pgsql/data/pg_hba.conf
+fi
+
+systemctl enable --now postgresql
+
+# Wait until Postgres accepts connections.
+for _ in $(seq 1 30); do
+  if sudo -u postgres psql -tc 'SELECT 1' >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+# Bootstrap the role and database. The heredocs are *quoted* (<<'CREATE_SQL'),
+# so the shell does no expansion on the body — the password lands literally
+# even if it contains shell-special characters. Terraform's templatefile()
+# has already substituted $${db_user}/$${db_password}/$${db_name} above the
+# shell stage, which is why the substitutions still work despite the quoting.
+# random_password's override_special excludes single-quote, so wrapping the
+# password in '...' for SQL is safe.
+ROLE_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${db_user}'" || true)
+
+if [ -z "$ROLE_EXISTS" ]; then
+  sudo -u postgres psql -v ON_ERROR_STOP=1 <<'CREATE_SQL'
+CREATE ROLE "${db_user}" WITH LOGIN PASSWORD '${db_password}';
+CREATE_SQL
+else
+  sudo -u postgres psql -v ON_ERROR_STOP=1 <<'ALTER_SQL'
+ALTER ROLE "${db_user}" WITH LOGIN PASSWORD '${db_password}';
+ALTER_SQL
+fi
+
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${db_name}'" | grep -q 1; then
+  sudo -u postgres createdb -O "${db_user}" "${db_name}"
+fi
+
+# core-engine bootstraps the schema itself via _bootstrap_schema() in
+# core-engine/app/main.py:62 — no init.sql load needed here.
+echo "postgres bootstrap complete"
