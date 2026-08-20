@@ -22,29 +22,32 @@ the SE annotate live during their demo).
 
 ### 2. `apm-entities.png` — NR APM service list
 
-* In NR → **APM & Services**, filter to entities prefixed `relifarm-`.
-* All three should be visible: `relifarm-core-engine`,
-  `relifarm-yield-forecast`, `relifarm-valve-scheduler`.
+* In NR → **APM & Services**, filter to entities whose name starts with
+  `ReliFarm`.
+* All three should be visible: `ReliFarm (<Environment>) - Core Engine`,
+  `ReliFarm (<Environment>) - Yield Forecast`,
+  `ReliFarm (<Environment>) - Valve Scheduler`.
 * Capture the list view showing throughput sparklines.
 
 ### 3. `distributed-trace.png` — the four-hop waterfall
 
 * Trigger an irrigation run from the dashboard.
-* In NR → APM & Services → `relifarm-core-engine` → click the most
-  recent `POST /executions`.
+* In NR → APM & Services → `ReliFarm (<Environment>) - Core Engine` →
+  click the most recent `POST /executions`.
 * Capture the Distributed Tracing waterfall with all four entities
   visible. The Postgres span at the bottom is the punchline — make
   sure it's in frame.
 
 ### 4. `errors-inbox.png` (optional)
 
-* In NR → **Errors Inbox**, filter to entity = `relifarm-core-engine`.
+* In NR → **Errors Inbox**, filter to entity =
+  `ReliFarm (<Environment>) - Core Engine`.
 * Capture the inbox after the synthetic monitor has tripped at least
   one error-injection run (~5 minutes after first apply).
 
 ### 5. `browser-app.png` (optional)
 
-* In NR → Browser → `relifarm-web-dash` overview.
+* In NR → Browser → `ReliFarm (<Environment>) - Web Dash` overview.
 * Capture the page-views chart + AJAX latency chart.
 
 ---

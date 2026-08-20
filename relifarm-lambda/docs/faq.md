@@ -12,8 +12,8 @@ item on the AWS bill. We need it because App Runner is configured with
 `egress_type = "VPC"` so the core-engine can reach RDS over private
 networking, and App Runner ENIs in a VPC connector never get public IPs.
 Without the NAT, the NR Python APM agent inside the container can't reach
-`collector.newrelic.com` and you'd see the `relifarm-core-engine` entity
-silently fail to register.
+`collector.newrelic.com` and you'd see the `ReliFarm (<Environment>) - Core
+Engine` entity silently fail to register.
 
 If you're redeploying into a customer account that already has a NAT
 (e.g. a non-default VPC with one), you can drop the NAT resources from
@@ -51,8 +51,8 @@ supported (external DNS requires a two-pass apply). See
 ### How do I prove the trace really crosses all four hops?
 
 Trigger an irrigation run from the dashboard, then in NR open the
-`relifarm-core-engine` entity → click the latest `POST /executions`
-transaction. The Distributed Tracing waterfall will show:
+`ReliFarm (<Environment>) - Core Engine` entity → click the latest
+`POST /executions` transaction. The Distributed Tracing waterfall will show:
 
 ```
 Browser/click → APIGatewayV2 → yield-forecast → APIGatewayV2

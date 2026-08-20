@@ -30,6 +30,13 @@ new_relic_region       = "US"   # "US" or "EU"
 # Resource name prefix (lets multiple engineers share one AWS account).
 name_prefix = "relifarm"
 
+# Environment label rendered into NR entity display names, e.g.
+# "ReliFarm (Sandbox) - Core Engine" (title-cased automatically — pass
+# lowercase here, e.g. "sandbox", "prod"). Independent of name_prefix, which
+# only affects AWS resource names. Leave unset/"" and entities render as
+# "ReliFarm () - Core Engine".
+environment = "sandbox"
+
 
 # =============================================================================
 # === ADVANCED ================================================================
