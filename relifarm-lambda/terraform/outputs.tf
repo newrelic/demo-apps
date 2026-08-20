@@ -73,8 +73,8 @@ output "browser_application_id" {
 }
 
 output "synthetic_monitor_id" {
-  description = "ID of the scripted browser synthetic monitor."
-  value       = newrelic_synthetics_script_monitor.farm_manager.id
+  description = "ID of the scripted browser synthetic monitor, or null when enable_load_gen_synthetic = false."
+  value       = one(newrelic_synthetics_script_monitor.farm_manager[*].id)
 }
 
 output "core_engine_url" {

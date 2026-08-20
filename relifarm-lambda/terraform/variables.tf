@@ -70,6 +70,23 @@ variable "name_prefix" {
   default     = "relifarm"
 }
 
+# ---------------------------------------------------------------------------
+# Environment label for NR entity display names (e.g. NEW_RELIC_APP_NAME).
+# Decoupled from name_prefix on purpose: name_prefix feeds AWS resource names
+# (ECR, App Runner, Lambda function names, IAM), which reject spaces/parens/
+# uppercase, while this only affects human-facing APM entity names.
+# ---------------------------------------------------------------------------
+variable "environment" {
+  description = "Environment label for NR entity display names, e.g. 'sandbox', 'prod'. Rendered in sentence case (see local.environment_display)."
+  type        = string
+  default     = ""
+}
+
+locals {
+  # "sandbox" -> "Sandbox", "prod" -> "Prod" — sentence case for display only.
+  environment_display = title(var.environment)
+}
+
 variable "lambda_runtime" {
   description = "Lambda Python runtime."
   type        = string
@@ -135,6 +152,12 @@ variable "local_nr_layer_zip_path" {
   description = "Path (relative to the terraform module dir) to a downloaded NR Python Lambda layer zip. Required when nr_layer_source = 'local'. See README 'Workaround: locally-bundled NR Lambda layer' for the download command."
   type        = string
   default     = "../lambdas/newrelic-layer.zip"
+}
+
+variable "enable_load_gen_synthetic" {
+  description = "Create the scripted browser synthetic monitor that continuously drives load against the dashboard (real-user-like traffic + ~25% error-injection runs). Default true. Set false to skip it — e.g. when demoing without wanting synthetic-generated traffic/errors mixed into the data."
+  type        = bool
+  default     = true
 }
 
 variable "synthetic_locations" {

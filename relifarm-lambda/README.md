@@ -10,10 +10,10 @@ local mathematical simulation; no third-party weather or SaaS APIs are called.
 ```mermaid
 flowchart TD
     Synth(["relifarm-dashboard-monitor<br/>(NR Scripted Browser — auto-provisioned load generator)"])
-    Dash["relifarm-web-dash<br/>(CloudFront + S3 + Browser Agent)"]
-    YF["relifarm-yield-forecast<br/>(Lambda)"]
-    VS["relifarm-valve-scheduler<br/>(Lambda)"]
-    CE["relifarm-core-engine<br/>(App Runner, FastAPI, APM)"]
+    Dash["web-dash<br/>(CloudFront + S3 + Browser Agent)"]
+    YF["yield-forecast<br/>(Lambda)"]
+    VS["valve-scheduler<br/>(Lambda)"]
+    CE["core-engine<br/>(App Runner, FastAPI, APM)"]
     PG[("RDS Postgres<br/>sectors · tractors · executions")]
 
     Synth ==>|every 5 min · ~25% trip 500s| Dash
@@ -211,12 +211,16 @@ Within a few minutes of `terraform apply` finishing, you should see:
   six sectors and is updating soil-moisture / soil-temperature numbers
   every 4 seconds. Clicking **Trigger Emergency Irrigation** on any sector
   produces a new row in "Recent irrigation executions" within ~5 seconds.
-* **In NR → APM & Services**: a `relifarm-core-engine` entity (Python),
-  plus two Lambda entities `relifarm-yield-forecast` and
-  `relifarm-valve-scheduler`. First-data lag is typically 2–5 minutes
-  after the App Runner service finishes starting.
-* **In NR → Browser**: a `relifarm-web-dash` Browser app with
-  `PageView` + `BrowserInteraction` events.
+* **In NR → APM & Services**: a `ReliFarm (<Environment>) - Core Engine`
+  entity (Python), plus two Lambda entities
+  `ReliFarm (<Environment>) - Yield Forecast` and
+  `ReliFarm (<Environment>) - Valve Scheduler`, where `<Environment>` is
+  the sentence-cased value of the `environment` tfvar (e.g. `Sandbox`,
+  `Prod`; blank/unset renders as `ReliFarm () - Core Engine`). First-data
+  lag is typically 2–5 minutes after the App Runner service finishes
+  starting.
+* **In NR → Browser**: a `ReliFarm (<Environment>) - Web Dash` Browser app
+  with `PageView` + `BrowserInteraction` events.
 * **In NR → Synthetic Monitoring**: `relifarm-dashboard-monitor` running
   on its `EVERY_5_MINUTES` schedule. The first run lands within ~5 min.
 * **In NR → Distributed Tracing**: traces spanning Browser →
@@ -281,7 +285,7 @@ Reference: [Browser distributed tracing — CORS configure](https://docs.newreli
 
    Strip the path — you want only `https://abc123.execute-api.us-east-1.amazonaws.com`.
 
-2. In New Relic, go to **one.newrelic.com → All capabilities → Browser** and select the `relifarm-web-dash` app.
+2. In New Relic, go to **one.newrelic.com → All capabilities → Browser** and select the `ReliFarm (<Environment>) - Web Dash` app.
 3. Left sidebar → **Settings → Application settings**.
 4. Scroll to **Cross-Origin Resource Sharing (CORS)**.
 5. In **Allowed origins**, paste the exact API Gateway origin from step 1.
@@ -369,8 +373,9 @@ To verify end-to-end:
 1. From the dashboard, click **Trigger Emergency Irrigation** on any sector.
    The "Recent irrigation executions" table updates within a few seconds.
 2. Open the trace, by either:
-   - **NR APM & Services → `relifarm-core-engine` →** click the latest
-     `POST /executions`. The trace UI opens with the full waterfall loaded.
+   - **NR APM & Services → `ReliFarm (<Environment>) - Core Engine` →**
+     click the latest `POST /executions`. The trace UI opens with the full
+     waterfall loaded.
    - **DevTools → Network →** click the latest `/yield-forecast` POST →
      response JSON contains `trace_id`.
 3. The waterfall in **Distributed tracing** shows:

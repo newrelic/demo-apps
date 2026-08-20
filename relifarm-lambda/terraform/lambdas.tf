@@ -223,6 +223,7 @@ resource "aws_lambda_function" "yield_forecast" {
 
   environment {
     variables = merge(local.newrelic_lambda_env, {
+      NEW_RELIC_APP_NAME  = "ReliFarm (${local.environment_display}) - Yield Forecast"
       VALVE_SCHEDULER_URL = "${aws_apigatewayv2_api.relifarm.api_endpoint}/valve-schedule"
     })
   }
@@ -242,7 +243,8 @@ resource "aws_lambda_function" "valve_scheduler" {
 
   environment {
     variables = merge(local.newrelic_lambda_env, {
-      CORE_ENGINE_URL = "https://${aws_apprunner_service.core_engine.service_url}"
+      NEW_RELIC_APP_NAME = "ReliFarm (${local.environment_display}) - Valve Scheduler"
+      CORE_ENGINE_URL    = "https://${aws_apprunner_service.core_engine.service_url}"
     })
   }
 }

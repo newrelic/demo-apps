@@ -15,10 +15,10 @@ vs. mixed).
       account the demo deployed under.
 - [ ] In NR, pin or open these in tabs in advance so you don't have to
       navigate live:
-  * APM & Services → `relifarm-core-engine`
-  * Browser → `relifarm-web-dash`
+  * APM & Services → `ReliFarm (<Environment>) - Core Engine`
+  * Browser → `ReliFarm (<Environment>) - Web Dash`
   * Synthetic Monitoring → `relifarm-dashboard-monitor`
-  * Errors Inbox (filtered to `relifarm-core-engine`)
+  * Errors Inbox (filtered to `ReliFarm (<Environment>) - Core Engine`)
 
 If the dashboard tables look stale, click **Trigger Emergency Irrigation**
 on a couple of sectors before sharing your screen so the trace data is
@@ -45,8 +45,8 @@ execution row appears within a few seconds.
 
 ## Act 2 — "One trace, four services" (2–3 minutes)
 
-**Switch to NR**: APM & Services → `relifarm-core-engine` → click the
-most recent `POST /executions` transaction.
+**Switch to NR**: APM & Services → `ReliFarm (<Environment>) - Core Engine`
+→ click the most recent `POST /executions` transaction.
 
 > "This is the trace from the click I just made. Look at the waterfall —
 > we're seeing four entities in one trace: the browser, both Lambdas, the
@@ -69,7 +69,7 @@ identifier. SEs say this is the moment buyers usually lean in.)
 
 ## Act 3 — "When things break" (2–3 minutes)
 
-**Show the Errors Inbox** filtered to `relifarm-core-engine`.
+**Show the Errors Inbox** filtered to `ReliFarm (<Environment>) - Core Engine`.
 
 > "We've got a synthetic monitor that exercises the irrigation chain
 > every 5 minutes and intentionally trips a 500 on about a quarter of
@@ -90,7 +90,8 @@ identifier. SEs say this is the moment buyers usually lean in.)
 
 ## Act 4 — "Built once, runs anywhere" (1–2 minutes, optional)
 
-**Show NR Browser**: the `relifarm-web-dash` Browser app overview.
+**Show NR Browser**: the `ReliFarm (<Environment>) - Web Dash` Browser app
+overview.
 
 > "Same story on the front end — pageviews, AJAX latency, JS errors,
 > the user's geographic distribution, all linked to the same traces

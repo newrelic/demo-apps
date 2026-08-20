@@ -87,6 +87,8 @@ locals {
 }
 
 resource "newrelic_synthetics_script_monitor" "farm_manager" {
+  count = var.enable_load_gen_synthetic ? 1 : 0
+
   name                                    = "${var.name_prefix}-farm-manager-journey"
   type                                    = "SCRIPT_BROWSER"
   period                                  = var.synthetic_period

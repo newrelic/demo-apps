@@ -8,7 +8,7 @@ locals {
   # Mirror of local.newrelic_lambda_env (lambdas.tf) for the App Runner runtime.
   newrelic_apprunner_env = {
     NEW_RELIC_LICENSE_KEY                            = var.new_relic_license_key
-    NEW_RELIC_APP_NAME                               = "${var.name_prefix}-core-engine"
+    NEW_RELIC_APP_NAME                               = "ReliFarm (${local.environment_display}) - Core Engine"
     NEW_RELIC_DISTRIBUTED_TRACING_ENABLED            = "true"
     NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED = "true"
   }

@@ -11,7 +11,7 @@
 
 # Browser app — receives RUM data from the dashboard.
 resource "newrelic_browser_application" "dashboard" {
-  name                        = "${var.name_prefix}-web-dash"
+  name                        = "ReliFarm (${local.environment_display}) - Web Dash"
   cookies_enabled             = true
   distributed_tracing_enabled = true
   # NerdGraph's AgentApplicationBrowserLoader enum: SPA = the modern Pro+SPA

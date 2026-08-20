@@ -57,8 +57,9 @@ Almost always one of:
   failing `/sectors` request. If it's a CORS error, the API Gateway
   CORS allowlist isn't picking up the dashboard origin — check
   `terraform output dashboard_url` matches what your browser shows.
-* **Dashboard loads, data flows, but no `relifarm-core-engine` entity in
-  NR**: see "Core-engine APM agent silently fails to register" below.
+* **Dashboard loads, data flows, but no `ReliFarm (<Environment>) - Core
+  Engine` entity in NR**: see "Core-engine APM agent silently fails to
+  register" below.
 
 ### "I want to start over"
 
@@ -125,14 +126,15 @@ Your AWS org SCP denies RDS. Switch to the EC2 Postgres path — see
 
 ### Core-engine APM agent silently fails to register
 
-Symptom: in NR, you don't see `relifarm-core-engine` as an APM entity. In
-the App Runner application logs you see only:
+Symptom: in NR, you don't see `ReliFarm (<Environment>) - Core Engine` as
+an APM entity. In the App Runner application logs you see only:
 
 ```
 newrelic.core.agent INFO - New Relic Python Agent (...)
 ... (long silence) ...
 newrelic.core.application WARNING - Registration of the application
-'relifarm-core-engine' with the data collector failed after multiple attempts.
+'ReliFarm (<Environment>) - Core Engine' with the data collector failed
+after multiple attempts.
 ```
 
 That gap is a TCP-connect timeout that the agent swallows. Root cause: the
