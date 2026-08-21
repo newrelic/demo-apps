@@ -96,8 +96,12 @@ check "nr_layer_currency" {
   assert {
     condition = (
       var.nr_layer_source != "pinned" ||
-      local.nr_layer_latest_version == null ||
-      var.new_relic_lambda_layer_version >= local.nr_layer_latest_version
+      # try() matters here: local.nr_layer_latest_version is always null in
+      # "local" mode (the lookup is skipped), and Terraform does not
+      # short-circuit `||` around type errors — `82 >= null` throws
+      # regardless of the two guard clauses before it. try() catches that
+      # and defaults to "pass" exactly where the null-check already intended.
+      try(var.new_relic_lambda_layer_version >= local.nr_layer_latest_version, true)
     )
     error_message = <<-MSG
 
