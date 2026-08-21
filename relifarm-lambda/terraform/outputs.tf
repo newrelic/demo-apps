@@ -109,8 +109,11 @@ output "nr_layer_status" {
     nr_published_latest_arn     = local.nr_layer_latest_arn
     is_up_to_date = (
       var.nr_layer_source != "pinned" ||
-      local.nr_layer_latest_version == null ||
-      var.new_relic_lambda_layer_version >= local.nr_layer_latest_version
+      # try() matters here: local.nr_layer_latest_version is always null in
+      # "local" mode, and Terraform does not short-circuit `||` around type
+      # errors — `82 >= null` throws regardless of the guard clause before
+      # it. Same fix as the nr_layer_currency check block (PR #34).
+      try(var.new_relic_lambda_layer_version >= local.nr_layer_latest_version, true)
     )
   }
 }
