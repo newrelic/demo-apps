@@ -58,6 +58,12 @@ resource "null_resource" "build_and_push_core_engine" {
   }
 
   provisioner "local-exec" {
+    # Without this, Terraform runs the command via the platform default
+    # shell — on Linux that's /bin/sh (dash on Ubuntu/GitHub-hosted
+    # runners), which doesn't support the bash-only `-o pipefail` below and
+    # fails immediately with "Illegal option -o pipefail".
+    interpreter = ["/bin/bash", "-c"]
+
     # When var.aws_profile is set, propagate it to `aws` and `docker` so the
     # ECR login uses the same identity as the Terraform provider. Empty string
     # leaves the subprocess to inherit the parent shell's credential env.
