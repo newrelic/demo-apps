@@ -137,6 +137,14 @@ resource "null_resource" "package_yield_forecast" {
   triggers = {
     handler_sha  = filesha256("${path.module}/../lambdas/yield-forecast/handler.py")
     requirements = filesha256("${path.module}/../lambdas/yield-forecast/requirements.txt")
+    # build/ lives only on the local filesystem, never in Terraform state.
+    # Without this, an unchanged hash above makes Terraform skip this
+    # provisioner entirely — fine on a dev machine that still has build/
+    # from a previous apply, but on a fresh checkout (every CI runner, or a
+    # second apply against existing remote state from a new machine) that
+    # directory was never actually created here, and the archive_file data
+    # source below then fails with "missing directory".
+    always_run = timestamp()
   }
 
   provisioner "local-exec" {
@@ -155,6 +163,8 @@ resource "null_resource" "package_valve_scheduler" {
   triggers = {
     handler_sha  = filesha256("${path.module}/../lambdas/valve-scheduler/handler.py")
     requirements = filesha256("${path.module}/../lambdas/valve-scheduler/requirements.txt")
+    # See the matching comment on null_resource.package_yield_forecast above.
+    always_run = timestamp()
   }
 
   provisioner "local-exec" {
