@@ -41,8 +41,8 @@ resource "aws_s3_bucket_public_access_block" "dashboard" {
 }
 
 # ---------------------------------------------------------------------------
-# Render index.html — substitute browser snippet, core-engine URL, and
-# yield-forecast URL into placeholder tokens.
+# Render index.html — substitute browser snippet, core-engine URL,
+# yield-forecast URL, and valve-scheduler URL into placeholder tokens.
 # ---------------------------------------------------------------------------
 locals {
   # The newrelic_browser_application.js_config attribute returns the bare
@@ -61,15 +61,19 @@ locals {
   index_rendered = replace(
     replace(
       replace(
-        file("${path.module}/../web-dash/index.html"),
-        "%%NEW_RELIC_BROWSER_SNIPPET%%",
-        local.browser_snippet
+        replace(
+          file("${path.module}/../web-dash/index.html"),
+          "%%NEW_RELIC_BROWSER_SNIPPET%%",
+          local.browser_snippet
+        ),
+        "%%CORE_ENGINE_URL%%",
+        "https://${aws_apprunner_service.core_engine.service_url}"
       ),
-      "%%CORE_ENGINE_URL%%",
-      "https://${aws_apprunner_service.core_engine.service_url}"
+      "%%YIELD_FORECAST_URL%%",
+      local.yield_forecast_url
     ),
-    "%%YIELD_FORECAST_URL%%",
-    local.yield_forecast_url
+    "%%VALVE_SCHEDULER_URL%%",
+    local.valve_scheduler_url
   )
 }
 

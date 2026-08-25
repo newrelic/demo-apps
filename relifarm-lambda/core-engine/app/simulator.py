@@ -13,6 +13,8 @@ import random
 import time
 from datetime import datetime, timezone
 
+import newrelic.agent
+
 from . import db
 
 logger = logging.getLogger("relifarm.simulator")
@@ -127,4 +129,5 @@ async def run_simulation_loop() -> None:
             logger.debug("Simulation tick complete (%.3fs)", elapsed)
         except Exception:
             logger.exception("Simulation tick failed")
+            newrelic.agent.notice_error()
         await asyncio.sleep(interval)
