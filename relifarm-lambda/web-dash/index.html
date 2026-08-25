@@ -26,6 +26,12 @@
         <div class="status-pill" id="connectionStatus">connecting…</div>
     </header>
 
+    <div class="demo-triggers">
+        <span class="demo-triggers-label">Failure scenarios</span>
+        <button id="btnBadPayload" class="demo-trigger" title="Sends malformed JSON straight to the yield-forecast Lambda — triggers its own 400 bad-request path.">Bad payload → yield-forecast</button>
+        <button id="btnMissingField" class="demo-trigger" title="Sends a request missing a required field straight to the valve-scheduler Lambda — triggers its own 400 validation path.">Missing field → valve-scheduler</button>
+    </div>
+
     <main>
         <section class="panel kpi-row">
             <div class="kpi"><span class="kpi-label">Avg moisture</span><span class="kpi-value" id="kpiMoisture">—</span></div>
@@ -79,8 +85,9 @@
     <script>
         // Build-time substitutions handled by Terraform.
         window.RELIFARM_CONFIG = {
-            coreEngineUrl:     "%%CORE_ENGINE_URL%%",
-            yieldForecastUrl:  "%%YIELD_FORECAST_URL%%"
+            coreEngineUrl:      "%%CORE_ENGINE_URL%%",
+            yieldForecastUrl:   "%%YIELD_FORECAST_URL%%",
+            valveSchedulerUrl:  "%%VALVE_SCHEDULER_URL%%"
         };
     </script>
     <script src="app.js"></script>

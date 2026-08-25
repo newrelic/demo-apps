@@ -60,12 +60,18 @@ function renderSectors(sectors) {
                     <button class="action" data-sector="${s.sector_id}" data-moisture="${s.soil_moisture_pct}" data-temp="${s.soil_temp_c}" data-area="${s.area_hectares}">
                         Trigger Emergency Irrigation
                     </button>
+                    <button class="action action-fail" data-sector="${s.sector_id}" data-moisture="${s.soil_moisture_pct}" data-temp="${s.soil_temp_c}" data-area="${s.area_hectares}">
+                        Simulate Failure
+                    </button>
                 </td>
             </tr>`;
     }).join("");
 
-    els.sectorBody.querySelectorAll("button.action").forEach(btn => {
+    els.sectorBody.querySelectorAll("button.action:not(.action-fail)").forEach(btn => {
         btn.addEventListener("click", () => triggerEmergencyIrrigation(btn));
+    });
+    els.sectorBody.querySelectorAll("button.action-fail").forEach(btn => {
+        btn.addEventListener("click", () => triggerEmergencyIrrigation(btn, { simulateFailure: true }));
     });
 
     const moistureAvg = sectors.reduce((acc, s) => acc + Number(s.soil_moisture_pct), 0) / Math.max(1, sectors.length);
@@ -125,7 +131,8 @@ async function refresh() {
 }
 
 // --- emergency irrigation --------------------------------------------------
-async function triggerEmergencyIrrigation(btn) {
+async function triggerEmergencyIrrigation(btn, { simulateFailure = false } = {}) {
+    const originalLabel = btn.textContent.trim();
     const payload = {
         sector_id: btn.dataset.sector,
         soil_moisture_pct: Number(btn.dataset.moisture),
@@ -133,15 +140,21 @@ async function triggerEmergencyIrrigation(btn) {
         area_hectares: Number(btn.dataset.area),
         triggered_by: "manual",
     };
+    if (simulateFailure) {
+        // Any truthy value here trips core-engine's intentional 500 path
+        // (see core-engine/app/main.py's create_execution) — same mechanism
+        // the load-gen synthetic uses, just on demand from this button.
+        payload.emergency_override = "manual_demo_trigger";
+    }
 
     btn.disabled = true;
     btn.textContent = "Sending…";
 
     if (window.newrelic) {
-        window.newrelic.addPageAction("emergency_irrigation_clicked", {
-            sector_id: payload.sector_id,
-            moisture: payload.soil_moisture_pct,
-        });
+        window.newrelic.addPageAction(
+            simulateFailure ? "emergency_irrigation_failure_clicked" : "emergency_irrigation_clicked",
+            { sector_id: payload.sector_id, moisture: payload.soil_moisture_pct }
+        );
     }
 
     try {
@@ -161,8 +174,56 @@ async function triggerEmergencyIrrigation(btn) {
         if (window.newrelic) window.newrelic.noticeError(err);
     } finally {
         btn.disabled = false;
-        btn.textContent = "Trigger Emergency Irrigation";
+        btn.textContent = originalLabel;
     }
+}
+
+// --- header demo triggers (direct Lambda error paths) ----------------------
+async function fireDemoTrigger(btn, { url, body, pageAction }) {
+    const originalLabel = btn.textContent.trim();
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+
+    if (window.newrelic) window.newrelic.addPageAction(pageAction, {});
+
+    try {
+        const resp = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+        });
+        const text = await resp.text().catch(() => "");
+        if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status} — ${text}`);
+        }
+        toast("Request succeeded (expected a failure — check the Lambda?)", "error");
+    } catch (err) {
+        console.error(pageAction + " failed as expected", err);
+        toast(`Failed: ${err.message}`, "error");
+        if (window.newrelic) window.newrelic.noticeError(err);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+    }
+}
+
+const btnBadPayload = document.getElementById("btnBadPayload");
+if (btnBadPayload) {
+    btnBadPayload.addEventListener("click", () => fireDemoTrigger(btnBadPayload, {
+        url: CONFIG.yieldForecastUrl,
+        body: "{not valid json",
+        pageAction: "demo_trigger_bad_payload",
+    }));
+}
+
+const btnMissingField = document.getElementById("btnMissingField");
+if (btnMissingField) {
+    btnMissingField.addEventListener("click", () => fireDemoTrigger(btnMissingField, {
+        // Omits the required yield_health field valve-scheduler expects.
+        url: CONFIG.valveSchedulerUrl,
+        body: JSON.stringify({ sector_id: "NW-A1", soil_moisture_pct: 30 }),
+        pageAction: "demo_trigger_missing_field",
+    }));
 }
 
 refresh();

@@ -86,9 +86,45 @@ button.action {
     font-weight: 600;
     cursor: pointer;
     font-size: 12px;
+    margin-right: 6px;
 }
 button.action:hover { background: #6ee7a3; }
 button.action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+button.action-fail {
+    background: transparent;
+    color: var(--accent-danger);
+    border: 1px solid var(--accent-danger);
+}
+button.action-fail:hover { background: rgba(239, 68, 68, 0.12); }
+
+.demo-triggers {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 28px;
+    background: #14171f;
+    border-bottom: 1px solid var(--panel-border);
+}
+.demo-triggers-label {
+    color: var(--fg-dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.0px;
+    margin-right: 4px;
+}
+button.demo-trigger {
+    background: transparent;
+    color: var(--accent-warm);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+}
+button.demo-trigger:hover { background: rgba(245, 158, 11, 0.12); }
+button.demo-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .toast {
     position: fixed;
