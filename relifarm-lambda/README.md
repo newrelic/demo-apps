@@ -9,7 +9,7 @@ local mathematical simulation; no third-party weather or SaaS APIs are called.
 
 ```mermaid
 flowchart TD
-    Synth(["relifarm-dashboard-monitor<br/>(NR Scripted Browser — auto-provisioned load generator)"])
+    Synth(["ReliFarm Farm Manager Journey<br/>(NR Scripted Browser — auto-provisioned load generator)"])
     Dash["web-dash<br/>(CloudFront + S3 + Browser Agent)"]
     YF["yield-forecast<br/>(Lambda)"]
     VS["valve-scheduler<br/>(Lambda)"]
@@ -65,6 +65,7 @@ core-engine code (the synthetic monitor only exists on the AWS path).
   - [Post-deploy: enable NR Browser CORS for distributed tracing](#post-deploy-enable-nr-browser-cors-for-distributed-tracing)
 - [Quick start — local Docker Compose (core-engine only)](#quick-start--local-docker-compose-core-engine-only)
 - [Telemetry touchpoints](#telemetry-touchpoints)
+- [New Relic resources created by Terraform](#new-relic-resources-created-by-terraform)
 - [Trace propagation — verification](#trace-propagation--verification)
 - [Teardown](#teardown)
 - [Tuning knobs](#tuning-knobs)
@@ -122,6 +123,25 @@ The numeric account ID is shown on the **API keys** page (top of the table)
 and at **avatar → Administration → Access management → Accounts**.
 
 Also note your **region**: `US` or `EU`. The login URL tells you which.
+
+### 4. Slack notification destination ID (`slack_destination_id`)
+
+Required — `terraform apply` fails outright without it (no default). This
+is the GUID of an existing NR **notification destination** of type
+`SLACK` (`terraform/nr_alerts.tf` routes the alert policy's Slack channel
+through it). It's not something you generate yourself from the credentials
+above — either ask whoever manages your org's NR↔Slack integration for an
+existing destination's ID, or create one:
+
+* **one.newrelic.com → Alerts → Notification destinations → Slack** (or
+  `newrelic_notification_destination` with `type = "SLACK"` if you'd
+  rather create it via Terraform yourself, outside this module).
+* The destination's ID is a UUID, e.g. `4e9f3925-0289-4ca0-a585-...`.
+
+Set it in `terraform.tfvars` (see `terraform.tfvars.example`) — **not** as
+an environment secret; that only applies to the separate `catapult-service`
+CI workflow, which maps its own `STAGING_SLACK_DESTINATION_ID` repo secret
+to this same variable for its own runs.
 
 ---
 
@@ -221,8 +241,9 @@ Within a few minutes of `terraform apply` finishing, you should see:
   starting.
 * **In NR → Browser**: a `ReliFarm (<Environment>) - Web Dash` Browser app
   with `PageView` + `BrowserInteraction` events.
-* **In NR → Synthetic Monitoring**: `relifarm-dashboard-monitor` running
-  on its `EVERY_5_MINUTES` schedule. The first run lands within ~5 min.
+* **In NR → Synthetic Monitoring**: `ReliFarm (<Environment>) - Farm Manager
+  Journey` running on its `EVERY_5_MINUTES` schedule. The first run lands
+  within ~5 min.
 * **In NR → Distributed Tracing**: traces spanning Browser →
   yield-forecast → valve-scheduler → core-engine → Postgres. See
   [Trace propagation — verification](#trace-propagation--verification)
@@ -241,6 +262,9 @@ What just happened (in order):
 6. Rendered the dashboard's `%%CORE_ENGINE_URL%%` / `%%YIELD_FORECAST_URL%%` placeholders.
 7. Uploaded the dashboard to a private S3 bucket fronted by CloudFront over HTTPS.
 8. Created the New Relic Browser app and Scripted Browser synthetic monitor.
+9. Looked up every other NR entity, tagged all of them, and created the
+   service levels, workload, and alert policy/conditions/Slack routing
+   described in [New Relic resources created by Terraform](#new-relic-resources-created-by-terraform).
 
 CloudFront rollout (~5–10 min) and RDS provisioning (~6 min) are the long
 poles, in parallel. The core-engine bootstraps the schema from
@@ -325,9 +349,11 @@ The simulator coroutine starts immediately and ticks every
   seeded sectors (`NW-A1`, `NW-A2`, …).
 * **`docker compose ps`** shows both `postgres` and `core-engine` as
   `Up (healthy)`.
-* **In NR → APM & Services**: a `relifarm-core-engine` entity appears
-  within ~2 minutes of bringing the stack up. You'll see Transactions for
-  `GET /sectors` and DB spans against Postgres.
+* **In NR → APM & Services**: a `ReliFarm (Local) - Core Engine` entity
+  (the `newrelic.ini` / `docker-compose.yml` fallback name — set
+  `NEW_RELIC_APP_NAME` in `.env` to override it) appears within ~2 minutes
+  of bringing the stack up. You'll see Transactions for `GET /sectors` and
+  DB spans against Postgres.
 * **No Browser, Lambda, or Synthetic data is expected on this path** —
   those entities only exist on the AWS deploy.
 
@@ -349,7 +375,27 @@ up` and the core-engine container exited".
 | Distributed tracing            | W3C Trace Context across all 4 hops              | see "Trace propagation" below                  |
 | Application logs               | Logs-in-context forwarding                       | NR ini + Lambda extension                      |
 | Errors                         | `notice_error()` on every catch boundary         | all four services                              |
-| Synthetic                      | Scripted Browser monitor + edge-case 500 inject  | `terraform/synthetics.tf`                      |
+| Synthetic                      | Scripted Browser monitor + edge-case 500 inject  | `terraform/nr_synthetics.tf`                   |
+
+---
+
+## New Relic resources created by Terraform
+
+Beyond the Browser app, Lambda instrumentation, and Synthetic monitor
+described above, this module also sets up entity governance and alerting
+across all of ReliFarm — five files, each independently named `nr_*.tf`:
+
+| File | Creates |
+| ---- | ------- |
+| `terraform/nr_entities.tf` | `data "newrelic_entity"` lookups for every agent-discovered entity: core-engine's APM/APPLICATION entity, **and** — because `NEW_RELIC_APM_LAMBDA_MODE = "true"` (`lambdas.tf`) makes each Lambda report there too — an APM/APPLICATION entity *and* a separate INFRA/AWSLAMBDAFUNCTION entity for both yield-forecast and valve-scheduler, plus the Browser app. All have `ignore_not_found = true`, since these resolve to `null` until the agent/layer has actually reported once — a fresh apply shouldn't hard-fail waiting on that. |
+| `terraform/nr_entity_tags.tf` | Tags every one of those entities, plus the Browser app and the Synthetic monitor (referenced directly as first-class resources, not via a second data lookup), via `newrelic_entity_tags`: `team`, `deploymentTier`, `heroChannel`, `githubRepo`, `appStack`, `managedBy`. |
+| `terraform/nr_service_levels.tf` | Four `newrelic_service_level` SLIs (95% success-rate target, rolling 7-day window) — core-engine / yield-forecast / valve-scheduler (`Transaction`/`TransactionError`-based) and web-dash (`PageView`/`JavaScriptError`-based). |
+| `terraform/nr_workloads.tf` | One `newrelic_workload` ("ReliFarm Engineering Components") grouping every tagged entity via `entity_search_query { query = "tags.nr.team = 'ReliFarm Engineering'" }`. |
+| `terraform/nr_alerts.tf` | One `newrelic_alert_policy`, five `newrelic_nrql_alert_condition`s (Browser / APM / Lambda low-throughput, synthetic-check-failing, service-level health), and a Slack `newrelic_notification_channel` + `newrelic_workflow` routing that policy's issues to it. **Requires `var.slack_destination_id`** — see "Get your New Relic credentials" → item 4 above; `terraform apply` fails outright without it. |
+
+None of this has an AWS-side counterpart — it's pure New Relic configuration,
+created/updated on every `apply` regardless of `use_ec2_postgres`,
+`enable_custom_domain`, or any other AWS-path toggle.
 
 ---
 
@@ -454,7 +500,8 @@ All AWS-deployment knobs are Terraform variables — set them in `terraform.tfva
 | Lambda memory / timeout                       | `terraform/variables.tf` → `lambda_memory_mb` / `lambda_timeout_seconds` | 256 MB / 15 s          |
 | NR Python Lambda layer version                | `terraform/variables.tf` → `new_relic_lambda_layer_version` | `82` (look up current at https://layers.newrelic-external.com/) |
 | Synthetic frequency                           | `terraform/variables.tf` → `synthetic_period` | `EVERY_5_MINUTES`      |
-| Synthetic error-run probability               | `terraform/synthetics.tf` → `ERROR_RUN_PROBABILITY` | `0.25`                 |
+| Synthetic error-run probability (core-engine 500 via `emergency_override`) | `terraform/nr_synthetics.tf` → `ERROR_RUN_PROBABILITY` | `0.25`     |
+| Synthetic malformed-payload probability (valve-scheduler 400) | `terraform/nr_synthetics.tf` → `MALFORMED_RUN_PROBABILITY` | `0.15` |
 | Local-dev simulation tick interval            | `.env` → `SIMULATION_INTERVAL_SECONDS` (docker-compose only) | `5` seconds            |
 
 ---
@@ -515,7 +562,12 @@ relifarm-lambda/
     ├── ec2_database.tf            ← Self-hosted Postgres on EC2 (SCP workaround)
     ├── frontend.tf                ← Browser app + private S3 + CloudFront OAC
     ├── dns.tf                     ← optional ACM certs + Route53 records
-    ├── synthetics.tf              ← Scripted Browser monitor
+    ├── nr_synthetics.tf           ← Scripted Browser monitor
+    ├── nr_entities.tf             ← data lookups for every agent-discovered NR entity
+    ├── nr_entity_tags.tf          ← tags applied across all of the above
+    ├── nr_service_levels.tf       ← 4 SLIs (core-engine, both Lambdas, web-dash)
+    ├── nr_workloads.tf            ← 1 workload grouping every tagged entity
+    ├── nr_alerts.tf               ← alert policy/conditions + Slack channel/workflow
     ├── outputs.tf
     └── terraform.tfvars.example   ← copy to terraform.tfvars (gitignored)
 ```

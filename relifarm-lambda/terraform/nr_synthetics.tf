@@ -1,16 +1,7 @@
-# =============================================================================
-# Scripted browser synthetic monitor
-#
-# Continuously navigates the ReliFarm dashboard, simulates farm-manager
-# actions (clicking the Trigger Emergency Irrigation button on whichever
-# sector row it lands on), and on two independent random rolls:
-#   - ~25% of runs sends a malicious payload directly to yield-forecast
-#     (targeting the same sector that was just clicked) that propagates
-#     through to core-engine and triggers an intentional 500 error path.
-#   - A separate roll sends a malformed body directly to valve-scheduler,
-#     triggering that Lambda's own 400 bad-request path.
-# This populates NR error analytics + DT charts for the demo.
-# =============================================================================
+# synthetic load generation for demo
+###
+# newrelic_synthetics_script_monitor.farm_manager.id
+###
 
 locals {
   dashboard_url = var.enable_custom_domain ? (
@@ -149,7 +140,7 @@ locals {
 resource "newrelic_synthetics_script_monitor" "farm_manager" {
   count = var.enable_load_gen_synthetic ? 1 : 0
 
-  name                                    = "${var.name_prefix}-farm-manager-journey"
+  name                                    = "ReliFarm (${local.environment_display}) - Farm Manager Journey"
   type                                    = "SCRIPT_BROWSER"
   period                                  = var.synthetic_period
   status                                  = "ENABLED"
@@ -158,6 +149,6 @@ resource "newrelic_synthetics_script_monitor" "farm_manager" {
   enable_screenshot_on_failure_and_script = true
 
   runtime_type         = "CHROME_BROWSER"
-  runtime_type_version = "100"
+  runtime_type_version = "LATEST"
   script_language      = "JAVASCRIPT"
 }

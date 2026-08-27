@@ -70,6 +70,12 @@ variable "name_prefix" {
   default     = "relifarm"
 }
 
+variable "slack_destination_id" {
+  description = "New Relic destination ID for cross-account Slack destination used for notification channel."
+  type        = string
+  sensitive   = true
+}
+
 # ---------------------------------------------------------------------------
 # Environment label for NR entity display names (e.g. NEW_RELIC_APP_NAME).
 # Decoupled from name_prefix on purpose: name_prefix feeds AWS resource names
@@ -160,12 +166,19 @@ variable "enable_load_gen_synthetic" {
   default     = true
 }
 
+# https://docs.newrelic.com/docs/synthetics/synthetic-monitoring/administration/synthetic-public-minion-ips/#location
+# AP_EAST_1, AP_SOUTH_1, AP_SOUTHEAST_1, AP_NORTHEAST_2, AP_NORTHEAST_1, AP_SOUTHEAST_2
+# US_WEST_1, US_WEST_2, US_EAST_2, US_EAST_1, CA_CENTRAL_1, SA_EAST_1
+# EU_WEST_1, EU_WEST_2, EU_WEST_3, EU_CENTRAL_1, EU_NORTH_1, EU_SOUTH_1
+# ME_SOUTH_1, AF_SOUTH_1
 variable "synthetic_locations" {
   description = "Public synthetic minion locations for the scripted browser monitor. Use the un-prefixed form (e.g. US_EAST_1, not AWS_US_EAST_1) — the NerdGraph API accepts both on write but reads back the un-prefixed form, so the prefixed form causes a perpetual diff in `terraform plan`."
   type        = list(string)
   default     = ["US_EAST_1", "EU_WEST_1"]
 }
 
+# EVERY_MINUTE, EVERY_5_MINUTES, EVERY_10_MINUTES, EVERY_15_MINUTES, EVERY_30_MINUTES
+# EVERY_HOUR, EVERY_6_HOURS, EVERY_12_HOURS, EVERY_DAY
 variable "synthetic_period" {
   description = "Synthetic monitor frequency."
   type        = string
