@@ -8,6 +8,7 @@
 
 # apm core-engine service success service level
 resource "newrelic_service_level" "core_engine_service_success_sl" {
+  count       = data.newrelic_entity.core_engine_apm.guid != null ? 1 : 0
   guid        = data.newrelic_entity.core_engine_apm.guid
   name        = "${data.newrelic_entity.core_engine_apm.name} - Success"
   description = "Proportion of requests that are served without errors."
@@ -43,6 +44,7 @@ resource "newrelic_service_level" "core_engine_service_success_sl" {
 
 # apm yield-forecast service success service level
 resource "newrelic_service_level" "yield_forecast_service_success_sl" {
+  count       = data.newrelic_entity.yield_forecast_apm.guid != null ? 1 : 0
   guid        = data.newrelic_entity.yield_forecast_apm.guid
   name        = "${data.newrelic_entity.yield_forecast_apm.name} - Success"
   description = "Proportion of requests that are served without errors."
@@ -78,6 +80,7 @@ resource "newrelic_service_level" "yield_forecast_service_success_sl" {
 
 # apm valve-scheduler service success service level
 resource "newrelic_service_level" "valve_scheduler_service_success_sl" {
+  count       = data.newrelic_entity.valve_scheduler_apm.guid != null ? 1 : 0
   guid        = data.newrelic_entity.valve_scheduler_apm.guid
   name        = "${data.newrelic_entity.valve_scheduler_apm.name} - Success"
   description = "Proportion of requests that are served without errors."
@@ -113,6 +116,7 @@ resource "newrelic_service_level" "valve_scheduler_service_success_sl" {
 
 # browser customer portal success service level
 resource "newrelic_service_level" "web_dash_browser_success_sl" {
+  count       = data.newrelic_entity.web_dash_browser.guid != null ? 1 : 0
   guid        = data.newrelic_entity.web_dash_browser.guid
   name        = "${data.newrelic_entity.web_dash_browser.name} Browser - Success"
   description = "Proportion of page views that are served without errors."

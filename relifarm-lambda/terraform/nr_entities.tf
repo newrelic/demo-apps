@@ -39,10 +39,11 @@ data "newrelic_entity" "valve_scheduler_apm" {
 
 ### BROWSER APPLICATION ###
 data "newrelic_entity" "web_dash_browser" {
-  name       = "ReliFarm (${local.environment_display}) - Web Dash"
-  domain     = "BROWSER"
-  type       = "APPLICATION"
-  account_id = var.new_relic_account_id
+  name             = "ReliFarm (${local.environment_display}) - Web Dash"
+  domain           = "BROWSER"
+  type             = "APPLICATION"
+  account_id       = var.new_relic_account_id
+  ignore_not_found = true
 }
 
 ### AWS LAMBDA FUNCTIONS ###
