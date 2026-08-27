@@ -27,6 +27,11 @@ new_relic_api_key      = "NRAK-xxxxxxxxxxxxxxxxxxxxxxxx"
 new_relic_license_key  = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxNRAL"
 new_relic_region       = "US"   # "US" or "EU"
 
+# Cross-account New Relic destination ID for the Slack notification channel
+# nr_alerts.tf creates (newrelic_notification_channel.staging_slack_relifarm_channel).
+# No default — required. Ask in #help-relifarm-engineering if you don't have one.
+slack_destination_id = "00000000-0000-0000-0000-000000000000"
+
 # Resource name prefix (lets multiple engineers share one AWS account).
 name_prefix = "relifarm"
 

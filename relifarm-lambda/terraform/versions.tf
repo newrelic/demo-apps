@@ -4,27 +4,27 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.70"
+      version = "~> 6.62"
     }
     newrelic = {
       source  = "newrelic/newrelic"
-      version = "~> 3.50"
+      version = "~> 3.96"
     }
     archive = {
       source  = "hashicorp/archive"
-      version = "~> 2.4"
+      version = "~> 2.8"
     }
     null = {
       source  = "hashicorp/null"
-      version = "~> 3.2"
+      version = "~> 3.3"
     }
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.6"
+      version = "~> 3.9"
     }
     http = {
       source  = "hashicorp/http"
-      version = "~> 3.4"
+      version = "~> 3.6"
     }
   }
 }

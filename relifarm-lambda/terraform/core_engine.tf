@@ -78,7 +78,7 @@ resource "null_resource" "build_and_push_core_engine" {
       }
 
       ACCOUNT_ID="${data.aws_caller_identity.current.account_id}"
-      REGION="${data.aws_region.current.name}"
+      REGION="${data.aws_region.current.region}"
       REPO_URL="${aws_ecr_repository.core_engine.repository_url}"
       TAG="${var.core_engine_image_tag}"
 

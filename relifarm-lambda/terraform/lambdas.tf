@@ -15,7 +15,7 @@
 data "http" "nr_layer_index" {
   count = var.nr_layer_source == "local" ? 0 : 1
 
-  url = "https://${data.aws_region.current.name}.layers.newrelic-external.com/get-layers?CompatibleRuntime=${var.lambda_runtime}&CompatibleArchitecture=x86_64"
+  url = "https://${data.aws_region.current.region}.layers.newrelic-external.com/get-layers?CompatibleRuntime=${var.lambda_runtime}&CompatibleArchitecture=x86_64"
 
   request_headers = {
     Accept = "application/json"
@@ -39,7 +39,7 @@ locals {
   lambda_layer_arn = (
     var.nr_layer_source == "local" ? aws_lambda_layer_version.newrelic_local[0].arn :
     var.nr_layer_source == "auto-latest" ? local.nr_layer_latest_arn :
-    "arn:aws:lambda:${data.aws_region.current.name}:${local.nr_layer_account}:layer:${local.nr_layer_name}:${var.new_relic_lambda_layer_version}"
+    "arn:aws:lambda:${data.aws_region.current.region}:${local.nr_layer_account}:layer:${local.nr_layer_name}:${var.new_relic_lambda_layer_version}"
   )
 
   # Numeric version actually in use, for the status output.
