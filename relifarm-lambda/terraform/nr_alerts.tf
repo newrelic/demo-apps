@@ -73,7 +73,7 @@ resource "newrelic_nrql_alert_condition" "relifarm_browser_low_throughput" {
     FROM PageView SELECT
       count(*)
     FACET appName AS 'entityName'
-    WHERE tags.team = 'ReliFarm Engineering'
+    WHERE entityGuid = '${data.newrelic_entity.web_dash_browser.guid}'
     EOT
     )
 
@@ -140,9 +140,9 @@ resource "newrelic_nrql_alert_condition" "relifarm_lambda_low_throughput" {
 
     query = trimspace(<<-EOT
     FROM ServerlessSample SELECT
-      count(*)
+      rate(sum(provider.invocations.Sum), 1 MINUTE)
     FACET entityName
-    WHERE tags.team = 'ReliFarm Engineering'
+    WHERE label.team = 'ReliFarm Engineering'
     EOT
     )
 
@@ -209,7 +209,7 @@ resource "newrelic_nrql_alert_condition" "relifarm_synthetic_failing" {
     query = trimspace(<<-EOT
     FROM SyntheticCheck SELECT
       percentage(count(*), WHERE result = 'FAILED')
-    FACET location, monitorName AS 'entityName'
+    FACET locationLabel, monitorName AS 'entityName'
     WHERE NOT isMuted
     AND tags.team = 'ReliFarm Engineering'
     EOT
