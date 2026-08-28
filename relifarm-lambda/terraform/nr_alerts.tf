@@ -106,9 +106,8 @@ resource "newrelic_nrql_alert_condition" "relifarm_apm_low_throughput" {
     query = trimspace(<<-EOT
     FROM Metric SELECT
       count(apm.service.transaction.duration)
-    FACET appName AS 'entityName'
-    WHERE appName LIKE '%'
-    AND tags.team = 'ReliFarm Engineering'
+    FACET entity.name
+    WHERE entity.guid IN ('${data.newrelic_entity.core_engine_apm.guid}','${data.newrelic_entity.valve_scheduler_apm.guid}','${data.newrelic_entity.yield_forecast_apm.guid}')
     EOT
     )
 
@@ -177,7 +176,7 @@ resource "newrelic_nrql_alert_condition" "relifarm_service_level_health" {
       count(*)
     FACET name AS 'entityName'
     WHERE type = 'EXT-SERVICE_LEVEL'
-    AND tags.team = 'ReliFarm Engineering'
+    AND id IN ('${join("','", concat(newrelic_service_level.core_engine_service_success_sl[*].sli_guid, newrelic_service_level.yield_forecast_service_success_sl[*].sli_guid, newrelic_service_level.valve_scheduler_service_success_sl[*].sli_guid, newrelic_service_level.web_dash_browser_success_sl[*].sli_guid))}')
     EOT
     )
 
