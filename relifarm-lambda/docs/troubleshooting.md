@@ -170,3 +170,36 @@ terraform apply -replace='aws_apprunner_service.core_engine'
 
 That ordering destroys the service first (releasing the connector), then
 the connector, then recreates both.
+
+### `Resource.AlreadyAssociated` on `aws_route_table_association.apprunner_private`
+
+```
+Error: creating Route Table (rtb-...) Association: ...
+api error Resource.AlreadyAssociated: the specified association for route
+table rtb-... conflicts with an existing association
+```
+
+The account has exactly one default VPC per region, so every environment's
+`data.aws_subnets.default` (`database.tf`) resolves to the *same* physical
+subnets — the NAT gateway / private route table / associations above are an
+account+region-wide singleton, not per-environment infra. AWS only allows one
+explicit route-table association per subnet.
+
+`core_engine.tf` handles this with `local.manage_shared_apprunner_networking`:
+only the **sandbox** environment creates the EIP/NAT gateway/route
+table/associations; every other environment skips that block entirely and
+relies on sandbox's, since the subnets are already NAT-routed once sandbox's
+association exists. If you see this error, it means some other environment's
+apply already claimed the association first — check
+`aws ec2 describe-route-tables --filters "Name=tag:Name,Values=*apprunner-private*"`
+to see which environment actually owns it, and make sure
+`local.manage_shared_apprunner_networking` still points at that environment.
+
+These four resources also carry `lifecycle { prevent_destroy = true }`, and
+`deploy-relifarm-lambda.yml`'s destroy step passes `-exclude` for all four
+when destroying sandbox specifically — a sandbox destroy removes everything
+else in the stack but deliberately leaves this block alone, since tearing it
+down would break internet egress for every other environment's App Runner
+service. If you ever need to actually retire it (e.g. moving ownership to a
+different environment), you'll need to remove `prevent_destroy` first, then
+destroy explicitly.
