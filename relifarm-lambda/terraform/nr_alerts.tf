@@ -10,6 +10,33 @@
 # newrelic_nrql_alert_condition.relifarm_service_level_health.entity_guid
 ###
 
+locals {
+  # web_dash_browser and the three *_apm entities (nr_entities.tf) use
+  # ignore_not_found = true - on a cold environment their guid resolves to a
+  # KNOWN null at plan time. Interpolating a null into a NRQL heredoc string
+  # is a hard Terraform error ("Invalid template interpolation value"),
+  # unlike the list/count contexts elsewhere in this repo
+  # (nr_service_levels.tf, nr_entity_tags.tf) where the same null is handled
+  # by gating a resource's own count.
+  #
+  # These two alert conditions are NOT count-gated: their entity_guid is
+  # already referenced unconditionally in nr_entity_tags.tf's
+  # relifarm_always_created_guids bucket (that's the alert condition's own,
+  # always-computed entity_guid - a different attribute from the
+  # data-source guid used inside the query body below). Gating count here
+  # would force moving those two entries into the conditional bucket for no
+  # real benefit, since the resource itself is always valid to create.
+  # Instead, coalesce the guid used inside the query string to a placeholder
+  # that can never match a real NR entity GUID - same shape as the
+  # coalesce() used in lambdas.tf for local.nr_layer_latest_version.
+  nr_entity_guid_placeholder = "guid-not-yet-discovered"
+
+  relifarm_web_dash_browser_guid    = coalesce(data.newrelic_entity.web_dash_browser.guid, local.nr_entity_guid_placeholder)
+  relifarm_core_engine_apm_guid     = coalesce(data.newrelic_entity.core_engine_apm.guid, local.nr_entity_guid_placeholder)
+  relifarm_valve_scheduler_apm_guid = coalesce(data.newrelic_entity.valve_scheduler_apm.guid, local.nr_entity_guid_placeholder)
+  relifarm_yield_forecast_apm_guid  = coalesce(data.newrelic_entity.yield_forecast_apm.guid, local.nr_entity_guid_placeholder)
+}
+
 # Staging Slack Notification Channel
 resource "newrelic_notification_channel" "staging_slack_relifarm_channel" {
   account_id     = var.new_relic_account_id
@@ -73,7 +100,7 @@ resource "newrelic_nrql_alert_condition" "relifarm_browser_low_throughput" {
     FROM PageView SELECT
       count(*)
     FACET appName AS 'entityName'
-    WHERE entityGuid = '${data.newrelic_entity.web_dash_browser.guid}'
+    WHERE entityGuid = '${local.relifarm_web_dash_browser_guid}'
     EOT
     )
 
@@ -107,7 +134,7 @@ resource "newrelic_nrql_alert_condition" "relifarm_apm_low_throughput" {
     FROM Metric SELECT
       count(apm.service.transaction.duration)
     FACET entity.name
-    WHERE entity.guid IN ('${data.newrelic_entity.core_engine_apm.guid}','${data.newrelic_entity.valve_scheduler_apm.guid}','${data.newrelic_entity.yield_forecast_apm.guid}')
+    WHERE entity.guid IN ('${local.relifarm_core_engine_apm_guid}','${local.relifarm_valve_scheduler_apm_guid}','${local.relifarm_yield_forecast_apm_guid}')
     EOT
     )
 
