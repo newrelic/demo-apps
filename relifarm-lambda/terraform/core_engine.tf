@@ -22,6 +22,19 @@ locals {
   pg_user     = var.use_ec2_postgres ? "relifarm" : one(aws_db_instance.core_engine[*].username)
   pg_db       = var.use_ec2_postgres ? "relifarm" : one(aws_db_instance.core_engine[*].db_name)
   pg_password = random_password.db_master.result
+
+  # The account only has one default VPC per region, so every environment's
+  # data.aws_subnets.default (database.tf) resolves to the same physical
+  # subnets - the NAT gateway / private route table / subnet associations
+  # below are an account+region-wide singleton, not per-environment infra.
+  # AWS allows only one explicit route-table association per subnet, so only
+  # ONE environment may create this block. sandbox already legitimately owns
+  # it (verified via `aws ec2 describe-route-tables`: rtb-077df42ea2dfda1ec,
+  # tagged relifarm-sandbox-apprunner-private, associated to both subnets).
+  # Every other environment must skip creating its own copy and rely on
+  # sandbox's — their aws_apprunner_vpc_connector still lists the same
+  # subnets, which are already NAT-routed once sandbox's association exists.
+  manage_shared_apprunner_networking = var.environment == "sandbox"
 }
 
 # ---------------------------------------------------------------------------
@@ -183,40 +196,86 @@ resource "aws_security_group_rule" "rds_from_apprunner" {
 # Subnet[0] keeps the IGW route, which is exactly what the EC2 Postgres in
 # that subnet relies on for `dnf install` outbound.
 # ---------------------------------------------------------------------------
+moved {
+  from = aws_eip.apprunner_nat
+  to   = aws_eip.apprunner_nat[0]
+}
+moved {
+  from = aws_nat_gateway.apprunner_egress
+  to   = aws_nat_gateway.apprunner_egress[0]
+}
+moved {
+  from = aws_route_table.apprunner_private
+  to   = aws_route_table.apprunner_private[0]
+}
+
 resource "aws_eip" "apprunner_nat" {
+  count = local.manage_shared_apprunner_networking ? 1 : 0
+
   domain = "vpc"
   tags = {
     Name = "${var.name_prefix}-apprunner-nat"
   }
+
+  # Backstop for the sandbox environment, which owns this shared singleton:
+  # deploy-relifarm-lambda.yml's destroy step passes `-exclude` for these
+  # four resources so a normal sandbox destroy removes everything else and
+  # leaves this alone, on purpose. prevent_destroy is the fallback for any
+  # OTHER path that tries to destroy it (e.g. a manual `terraform destroy`
+  # without those flags) — it hard-aborts instead of silently breaking
+  # internet egress for every other environment's App Runner service (see
+  # the manage_shared_apprunner_networking comment above).
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_nat_gateway" "apprunner_egress" {
-  allocation_id = aws_eip.apprunner_nat.id
+  count = local.manage_shared_apprunner_networking ? 1 : 0
+
+  allocation_id = aws_eip.apprunner_nat[0].id
   subnet_id     = data.aws_subnets.default.ids[0]
 
   tags = {
     Name = "${var.name_prefix}-apprunner-egress"
   }
+
+  # See aws_eip.apprunner_nat above — same backstop, same reasoning.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_route_table" "apprunner_private" {
+  count = local.manage_shared_apprunner_networking ? 1 : 0
+
   vpc_id = data.aws_vpc.default.id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.apprunner_egress.id
+    nat_gateway_id = aws_nat_gateway.apprunner_egress[0].id
   }
 
   tags = {
     Name = "${var.name_prefix}-apprunner-private"
   }
+
+  # See aws_eip.apprunner_nat above — same backstop, same reasoning.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_route_table_association" "apprunner_private" {
-  for_each = toset(slice(data.aws_subnets.default.ids, 1, length(data.aws_subnets.default.ids)))
+  for_each = local.manage_shared_apprunner_networking ? toset(slice(data.aws_subnets.default.ids, 1, length(data.aws_subnets.default.ids))) : toset([])
 
   subnet_id      = each.value
-  route_table_id = aws_route_table.apprunner_private.id
+  route_table_id = aws_route_table.apprunner_private[0].id
+
+  # See aws_eip.apprunner_nat above — same backstop, same reasoning.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_apprunner_vpc_connector" "core_engine" {
