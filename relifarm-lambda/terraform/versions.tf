@@ -29,9 +29,27 @@ terraform {
   }
 }
 
+locals {
+  # Mirrors the New Relic entity tags in nr_entity_tags.tf, in AWS-conventional
+  # TitleCase keys, so the AWS console/cost-allocation view stays consistent
+  # with the NR entity view.
+  common_aws_tags = {
+    Team           = "ReliFarm Engineering"
+    DeploymentTier = var.environment
+    HeroChannel    = "help-relifarm-engineering"
+    GithubRepo     = "https://github.com/newrelic/demo-apps/tree/main/relifarm-lambda"
+    AppStack       = "relifarm"
+    ManagedBy      = "terraform"
+  }
+}
+
 provider "aws" {
   region  = var.aws_region
   profile = var.aws_profile != "" ? var.aws_profile : null
+
+  default_tags {
+    tags = local.common_aws_tags
+  }
 }
 
 # CloudFront viewer certificates (ACM) must live in us-east-1 regardless of
@@ -41,6 +59,10 @@ provider "aws" {
   alias   = "us_east_1"
   region  = "us-east-1"
   profile = var.aws_profile != "" ? var.aws_profile : null
+
+  default_tags {
+    tags = local.common_aws_tags
+  }
 }
 
 provider "newrelic" {
