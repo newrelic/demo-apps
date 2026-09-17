@@ -1,0 +1,12 @@
+[
+  { "rank": 1, "playerName": "NovaStrike", "team": "Aurora Five", "region": "NA", "score": 98420 },
+  { "rank": 2, "playerName": "EchoBlade", "team": "Crimson Wolves", "region": "EU", "score": 96110 },
+  { "rank": 3, "playerName": "PixelAce", "team": "Aurora Five", "region": "NA", "score": 94875 },
+  { "rank": 4, "playerName": "StormRider", "team": "Nightfall Union", "region": "APAC", "score": 91230 },
+  { "rank": 5, "playerName": "VelvetFox", "team": "Crimson Wolves", "region": "EU", "score": 89990 },
+  { "rank": 6, "playerName": "ZenithCore", "team": "Iron Comet", "region": "NA", "score": 88410 },
+  { "rank": 7, "playerName": "GlitchRunner", "team": "Nightfall Union", "region": "APAC", "score": 86750 },
+  { "rank": 8, "playerName": "SolaraVex", "team": "Iron Comet", "region": "NA", "score": 85120 },
+  { "rank": 9, "playerName": "ShadowMint", "team": "Aurora Five", "region": "EU", "score": 83990 },
+  { "rank": 10, "playerName": "DriftHawk", "team": "Nightfall Union", "region": "APAC", "score": 81440 }
+]

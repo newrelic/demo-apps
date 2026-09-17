@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ReliGames — Live Leaderboard</title>
+  <link rel="stylesheet" href="/css/shell.css" />
+
+  <script>
+    window.NREUM||(NREUM={});
+    // Copied verbatim from the account's real Browser app snippet -- this
+    // whole object is a copy/paste artifact. If New Relic issues a new
+    // snippet (e.g. after changing settings in the account), replace this
+    // entire block from the fresh snippet rather than hand-editing keys;
+    // the account's own export is the source of truth, including its
+    // api.register block (a preview feature the account has opted into
+    // directly, so we no longer add our own override on top of it).
+    NREUM.init = {
+      browser_consent_mode: { enabled: false },
+      privacy: { cookies_enabled: true },
+      session_replay: {
+        enabled: true,
+        block_selector: '',
+        mask_text_selector: '',
+        sampling_rate: 100.0,
+        error_sampling_rate: 100.0,
+        mask_all_inputs: false,
+        collect_fonts: true,
+        inline_images: false,
+        inline_stylesheet: true,
+        fix_stylesheets: true,
+        preload: false,
+        mask_input_options: {}
+      },
+      distributed_tracing: { enabled: true },
+      performance: { capture_detail: true, capture_marks: true, capture_measures: true },
+      ajax: { deny_list: ["bam.nr-data.net"], capture_payloads: 'none' },
+      web_sockets: { enabled: false },
+      api: {
+        register: {
+          enabled: true,
+          duplicate_data_to_container: false
+        }
+      }
+    };
+    NREUM.loader_config = {
+      accountID: "${NEW_RELIC_ACCOUNT_ID}",
+      trustKey: "${NEW_RELIC_TRUST_KEY}",
+      agentID: "${NEW_RELIC_AGENT_ID}",
+      licenseKey: "${NEW_RELIC_LICENSE_KEY}",
+      applicationID: "${NEW_RELIC_APPLICATION_ID}"
+    };
+    NREUM.info = {
+      beacon: "bam.nr-data.net",
+      errorBeacon: "bam.nr-data.net",
+      licenseKey: "${NEW_RELIC_LICENSE_KEY}",
+      applicationID: "${NEW_RELIC_APPLICATION_ID}",
+      sa: 1
+    };
+  </script>
+  <!--
+    The account's snippet inlines the whole compiled agent rather than
+    pointing at a js-agent.newrelic.com CDN URL, so we ship that same bundle
+    verbatim as a static asset here instead. This MUST stay a plain,
+    parser-blocking <script src> (no async/defer, not dynamically created via
+    JS) immediately after the config block above, exactly mirroring the
+    account snippet's own two-adjacent-<script>-tags structure -- a
+    dynamically-inserted script defaults to async and doesn't block
+    DOMContentLoaded, which lets the MFEs' register() calls race ahead of the
+    agent finishing to load (confirmed while wiring this up: register() was
+    observed to not exist yet at DOMContentLoaded with the async version).
+    With NR unconfigured (blank .env), the agent's own internal config checks
+    no-op harvesting gracefully rather than erroring, so no extra JS-side
+    guard is needed here.
+  -->
+  <script src="/js/newrelic-agent.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">ReliGames</div>
+    <nav>
+      <button id="simulate-app-error-btn" type="button" class="danger">Simulate App Error</button>
+      <button id="profile-toggle-btn" type="button">My Profile</button>
+    </nav>
+  </header>
+
+  <main>
+    <section
+      id="mfe-leaderboard-root"
+      class="mfe-panel"
+      data-nr-mfe-id="a3f1c2d0-4b3e-4b7a-9c1d-1f2e3a4b5c6d"
+      aria-label="Leaderboard micro frontend"
+    >
+      <p class="loading">Loading leaderboard...</p>
+    </section>
+
+    <aside
+      id="mfe-profile-root"
+      class="mfe-drawer"
+      data-nr-mfe-id="d8e2b6f4-9a1c-4e5d-8b3a-2c7d6e5f4a3b"
+      hidden
+      aria-label="Player profile micro frontend"
+    ></aside>
+  </main>
+
+  <script src="/js/mfe-leaderboard.min.js"></script>
+  <script src="/js/mfe-profile.min.js"></script>
+  <script src="/js/shell.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+name: religames-browser-mfe
+
+services:
+  shell:
+    build: ./shell
+    container_name: religames-shell
+    ports:
+      - "${SHELL_PORT:-8098}:80"
+    environment:
+      NEW_RELIC_ACCOUNT_ID: ${NEW_RELIC_ACCOUNT_ID:-}
+      NEW_RELIC_TRUST_KEY: ${NEW_RELIC_TRUST_KEY:-}
+      NEW_RELIC_AGENT_ID: ${NEW_RELIC_AGENT_ID:-}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APPLICATION_ID: ${NEW_RELIC_APPLICATION_ID:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - religames-network
+
+  loadgen:
+    build: ./loadgen
+    container_name: religames-loadgen
+    depends_on:
+      shell:
+        condition: service_healthy
+    environment:
+      SHELL_URL: http://shell:80
+      LOADGEN_USERS: ${LOADGEN_USERS:-3}
+      LOADGEN_INTERVAL_MS: ${LOADGEN_INTERVAL_MS:-15000}
+    restart: unless-stopped
+    networks:
+      - religames-network
+
+networks:
+  religames-network:
+    driver: bridge
