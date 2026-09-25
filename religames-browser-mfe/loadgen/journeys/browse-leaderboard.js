@@ -37,4 +37,4 @@ async function run(driver, url) {
   await driver.sleep(400);
 }
 
-export default { name: 'browse-leaderboard', weight: 3, run };
+export default { name: 'browse-leaderboard', weight: 3, minDurationMs: 45000, run };

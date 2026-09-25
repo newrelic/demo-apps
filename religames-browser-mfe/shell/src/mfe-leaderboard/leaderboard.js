@@ -8,6 +8,15 @@ const LEADERBOARD_ID = 'a3f1c2d0-4b3e-4b7a-9c1d-1f2e3a4b5c6d';
 let agent = null;
 let rootEl = null;
 
+// Deterministic control/treatment split so the same player always lands in
+// the same variant across page views (e.g. for an A/B-test-style filter).
+function leaderboardVariant(userId) {
+  const hash = String(userId || '')
+    .split('')
+    .reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return hash % 2 === 0 ? 'control' : 'treatment';
+}
+
 function renderShell(root) {
   root.innerHTML = `
     <div class="panel-header">
@@ -50,10 +59,15 @@ function renderRows(listEl, players, filterText) {
 
 export async function mount(root, { userId, appVersion } = {}) {
   rootEl = root;
-  agent = registerMfe(LEADERBOARD_ID, 'Leaderboard', { utility: 'Product', internal: false });
+  agent = registerMfe(LEADERBOARD_ID, 'ReliGames MFE - Leaderboard', { utility: 'Product', internal: false });
 
   if (userId) agent.setUserId(userId);
   if (appVersion) agent.setApplicationVersion(appVersion);
+  // register()-scoped setCustomAttribute: local to this MFE's own attrs bag,
+  // merged (as source.*) into every subsequent event this agent emits --
+  // contrast with the global newrelic.setCustomAttribute call in shell.js,
+  // which fans out to every exposed agent instance on the page.
+  agent.setCustomAttribute('leaderboardVariant', leaderboardVariant(userId));
   agent.log('Leaderboard mounting', { level: 'info', customAttributes: { userId, appVersion } });
 
   const renderStart = performance.now();

@@ -8,6 +8,6 @@ TEMPLATE=/usr/share/nginx/templates/index.html.template
 OUTPUT=/usr/share/nginx/html/index.html
 
 if [ -f "$TEMPLATE" ]; then
-  envsubst '${NEW_RELIC_ACCOUNT_ID} ${NEW_RELIC_TRUST_KEY} ${NEW_RELIC_AGENT_ID} ${NEW_RELIC_LICENSE_KEY} ${NEW_RELIC_APPLICATION_ID}' \
+  envsubst '${NEW_RELIC_ACCOUNT_ID} ${NEW_RELIC_TRUST_KEY} ${NEW_RELIC_AGENT_ID} ${NEW_RELIC_LICENSE_KEY} ${NEW_RELIC_APPLICATION_ID} ${NEW_RELIC_DUPLICATE_TO_CONTAINER}' \
     < "$TEMPLATE" > "$OUTPUT"
 fi

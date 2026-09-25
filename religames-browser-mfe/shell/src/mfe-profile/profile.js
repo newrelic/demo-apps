@@ -1,10 +1,9 @@
 import { registerMfe } from '../lib/nr-agent.js';
+import * as redeemWidget from './redeem-widget.js';
 
 // Stable entity id -- must match the data-nr-mfe-id on #mfe-profile-root in
 // index.html.template so clicks/keys on the drawer are attributed to this MFE.
 const PROFILE_ID = 'd8e2b6f4-9a1c-4e5d-8b3a-2c7d6e5f4a3b';
-
-const VALID_REWARD_CODES = new Set(['RELIGAMES2026', 'LEVELUP', 'MVPWEEK']);
 
 let agent = null;
 let rootEl = null;
@@ -22,12 +21,7 @@ function renderShell(root, userId) {
       <h3>Recent Matches</h3>
       <div id="match-list" class="match-list">Loading...</div>
 
-      <h3>Redeem Reward Code</h3>
-      <form id="redeem-form">
-        <input id="redeem-code" type="text" placeholder="Enter code" autocomplete="off" />
-        <button type="submit">Redeem</button>
-      </form>
-      <p id="redeem-status"></p>
+      <div id="redeem-widget-root"></div>
 
       <h3>Stay in the loop</h3>
       <label class="notify-field">
@@ -40,7 +34,7 @@ function renderShell(root, userId) {
 
 export async function mount(root, { userId, appVersion } = {}) {
   rootEl = root;
-  agent = registerMfe(PROFILE_ID, 'Player Profile', { utility: 'Product', internal: false });
+  agent = registerMfe(PROFILE_ID, 'ReliGames MFE - Player Profile', { utility: 'Product', internal: false });
 
   if (userId) agent.setUserId(userId);
   if (appVersion) agent.setApplicationVersion(appVersion);
@@ -82,42 +76,14 @@ export async function mount(root, { userId, appVersion } = {}) {
     document.dispatchEvent(new CustomEvent('religames:closeProfile'));
   });
 
-  const redeemForm = root.querySelector('#redeem-form');
-  const redeemStatus = root.querySelector('#redeem-status');
-
-  redeemForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const code = root.querySelector('#redeem-code').value.trim().toUpperCase();
-    agent.addPageAction('rewardCodeSubmitted', { code, userId });
-    agent.log('Reward code submitted', { level: 'info', customAttributes: { code } });
-
-    try {
-      if (!code) {
-        throw new Error('Reward code cannot be empty');
-      }
-      if (!VALID_REWARD_CODES.has(code)) {
-        throw new Error(`Invalid reward code: ${code}`);
-      }
-
-      agent.recordCustomEvent('RewardRedeemed', { code, userId });
-      agent.log('Reward code redeemed', { level: 'info', customAttributes: { code } });
-      redeemStatus.textContent = 'Reward redeemed! Check your inventory.';
-      redeemStatus.className = 'status-success';
-    } catch (err) {
-      // Purposeful error (2 of 2 in the app): explicit try/catch + noticeError,
-      // contrasting with the Leaderboard's uncaught/automatic error path.
-      agent.noticeError(err, { context: 'reward-redeem', code });
-      agent.log('Reward code rejected', {
-        level: 'warn',
-        customAttributes: { code, message: err.message },
-      });
-      redeemStatus.textContent = err.message;
-      redeemStatus.className = 'status-error';
-    }
-  });
+  // Nested MFE: registered with `parent` pointing at this MFE's own
+  // registration target, so its events attribute up through Player Profile
+  // rather than defaulting straight to the container.
+  redeemWidget.mount(root.querySelector('#redeem-widget-root'), { agent, userId });
 }
 
 export function unmount() {
+  redeemWidget.unmount();
   if (agent) {
     agent.log('Player profile closed', { level: 'info' });
     agent.deregister();

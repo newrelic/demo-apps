@@ -28,4 +28,4 @@ async function run(driver, url) {
   await driver.sleep(300);
 }
 
-export default { name: 'view-profile-redeem', weight: 3, run };
+export default { name: 'view-profile-redeem', weight: 3, minDurationMs: 45000, run };

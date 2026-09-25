@@ -39,7 +39,7 @@
       api: {
         register: {
           enabled: true,
-          duplicate_data_to_container: false
+          duplicate_data_to_container: ${NEW_RELIC_DUPLICATE_TO_CONTAINER}
         }
       }
     };
@@ -80,6 +80,7 @@
     <div class="brand">ReliGames</div>
     <nav>
       <button id="simulate-app-error-btn" type="button" class="danger">Simulate App Error</button>
+      <button id="simulate-mfe-collision-btn" type="button" class="danger">Simulate Misconfigured MFE</button>
       <button id="profile-toggle-btn" type="button">My Profile</button>
     </nav>
   </header>

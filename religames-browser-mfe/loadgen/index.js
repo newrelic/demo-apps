@@ -7,8 +7,25 @@ import viewProfileRedeem from './journeys/view-profile-redeem.js';
 import profileInvalidCodeError from './journeys/profile-invalid-code-error.js';
 import appError from './journeys/app-error.js';
 import quickBounce from './journeys/quick-bounce.js';
+// mfe-collision-demo.js is deliberately not imported/run here -- the id/name
+// collision warnings it triggers are demo-only noise best driven by a human
+// clicking "Simulate Misconfigured MFE" on purpose, not by unattended,
+// continuous loadgen traffic. The journey file is kept for posterity/future
+// use; see README.md > "id/name collision warnings".
 
-const journeys = [browseLeaderboard, viewProfileRedeem, profileInvalidCodeError, appError, quickBounce];
+const journeys = [
+  browseLeaderboard,
+  viewProfileRedeem,
+  profileInvalidCodeError,
+  appError,
+  quickBounce,
+];
+
+// Session Replay recordings are more useful the longer a page stays open and
+// active, so journeys hold the tab open for at least this long before
+// quitting the driver (unless they declare a shorter minDurationMs, like
+// quick-bounce's intentionally fast bounce).
+const DEFAULT_MIN_JOURNEY_DURATION_MS = 45000;
 
 const SHELL_URL = process.env.SHELL_URL || 'http://shell:80';
 const LOADGEN_USERS = Math.min(parseInt(process.env.LOADGEN_USERS || '3', 10), users.length);
@@ -74,7 +91,12 @@ async function runVirtualUser(profile, index) {
     try {
       console.log(`[loadgen ${index}] ${profile.userId} (${profile.appVersion}) -> ${journey.name}`);
       driver = await createDriver();
+      const journeyStart = Date.now();
       await journey.run(driver, url);
+
+      const minDurationMs = journey.minDurationMs ?? DEFAULT_MIN_JOURNEY_DURATION_MS;
+      const remaining = minDurationMs - (Date.now() - journeyStart);
+      if (remaining > 0) await sleep(remaining);
     } catch (err) {
       console.error(`[loadgen ${index}] journey "${journey.name}" failed:`, err.message);
     } finally {

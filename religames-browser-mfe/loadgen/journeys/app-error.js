@@ -10,4 +10,4 @@ async function run(driver, url) {
   await driver.sleep(400);
 }
 
-export default { name: 'app-error', weight: 2, run };
+export default { name: 'app-error', weight: 2, minDurationMs: 45000, run };

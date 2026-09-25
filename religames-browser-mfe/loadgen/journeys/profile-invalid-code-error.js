@@ -17,4 +17,4 @@ async function run(driver, url) {
   await driver.sleep(300);
 }
 
-export default { name: 'profile-invalid-code-error', weight: 2, run };
+export default { name: 'profile-invalid-code-error', weight: 2, minDurationMs: 45000, run };

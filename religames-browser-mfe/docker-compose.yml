@@ -12,6 +12,7 @@ services:
       NEW_RELIC_AGENT_ID: ${NEW_RELIC_AGENT_ID:-}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
       NEW_RELIC_APPLICATION_ID: ${NEW_RELIC_APPLICATION_ID:-}
+      NEW_RELIC_DUPLICATE_TO_CONTAINER: ${NEW_RELIC_DUPLICATE_TO_CONTAINER:-true}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
       interval: 10s

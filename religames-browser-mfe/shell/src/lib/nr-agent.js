@@ -4,12 +4,16 @@
 // agent isn't configured yet, so every MFE can call the same API regardless
 // of whether NR instrumentation has been wired up.
 
-export function registerMfe(id, name, tags) {
+export function registerMfe(id, name, tags, { parent } = {}) {
   const nr = typeof window !== 'undefined' ? window.newrelic : undefined;
 
   if (nr && typeof nr.register === 'function') {
     try {
-      const agent = nr.register({ id, name, tags });
+      // Omitting `parent` lets the agent default it to the container/host
+      // agent (type "BA"); passing the parent registration's own
+      // `metadata.target` nests this entity under it (type "MFE") instead --
+      // see mfe-profile/redeem-widget.js for a nested example.
+      const agent = parent ? nr.register({ id, name, tags, parent }) : nr.register({ id, name, tags });
       if (agent) return agent;
     } catch (err) {
       console.warn(`[${name}] newrelic.register() threw, falling back to no-op agent`, err);
