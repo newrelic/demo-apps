@@ -10,4 +10,6 @@ resource "newrelic_workload" "relifarm_workload" {
   entity_search_query {
     query = "tags.nr.team = 'ReliFarm Engineering'"
   }
+
+  scope_account_ids = [var.new_relic_account_id]
 }
