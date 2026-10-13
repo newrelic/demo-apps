@@ -63,7 +63,8 @@ def agent_minimal_repair():
         response.raise_for_status()
         return jsonify(response.json())
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        current_app.logger.error(f"Minimal repair request failed: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Minimal repair request failed"}), 500
 
 
 @bp.route('/agent/manual-repair', methods=['POST'])
@@ -81,4 +82,5 @@ def agent_manual_repair():
         response.raise_for_status()
         return jsonify(response.json())
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        current_app.logger.error(f"Manual repair request failed: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Manual repair request failed"}), 500

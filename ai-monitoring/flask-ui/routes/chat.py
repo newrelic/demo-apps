@@ -112,14 +112,16 @@ def get_prompts():
             }), response.status_code
 
     except requests.exceptions.RequestException as e:
+        current_app.logger.error(f"Failed to fetch prompts from AI agent: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': f'Failed to fetch prompts from AI agent: {str(e)}',
+            'error': 'Failed to fetch prompts from AI agent',
             'prompts': []
         }), 500
     except Exception as e:
+        current_app.logger.error(f"Unexpected error fetching prompts: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': f'Unexpected error: {str(e)}',
+            'error': 'Unexpected error while fetching prompts',
             'prompts': []
         }), 500
