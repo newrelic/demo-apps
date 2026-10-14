@@ -131,7 +131,7 @@ def clean_chat_output(text: str) -> str:
         return fa_match.group(1).strip()
 
     # 2. Strip ReAct tokens
-    match = re.search(r'(^|\n+)(Thought|Action Input|Action|Observation):\s', text)
+    match = re.search(r'^(Thought|Action Input|Action|Observation):\s', text, re.MULTILINE)
     if match:
         prose = text[:match.start()].strip()
         # Discard prose that looks like an echoed question (short, ends with ?)
