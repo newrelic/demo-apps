@@ -3,10 +3,10 @@ FROM selenium/standalone-chromium:latest
 # Switch to root to install Node.js
 USER root
 
-# Install Node.js 18
+# Install Node.js 24
 RUN apt-get update && apt-get install -y \
     curl \
-    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
