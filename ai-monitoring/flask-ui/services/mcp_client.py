@@ -3,8 +3,11 @@ Client for communicating with the MCP Server.
 """
 
 import json
+import logging
 import requests
 from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class MCPClient:
@@ -28,7 +31,8 @@ class MCPClient:
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            return {"error": str(e)}
+            logger.error(f"[MCP-CLIENT] docker_ps failed: {e}", exc_info=True)
+            return {"error": "Unable to retrieve container status"}
 
     def get_container_logs(self, service_name: str, lines: int = 50) -> Dict[str, Any]:
         """Get container logs."""
@@ -40,7 +44,8 @@ class MCPClient:
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            return {"error": str(e)}
+            logger.error(f"[MCP-CLIENT] get_container_logs failed for {service_name}: {e}", exc_info=True)
+            return {"error": f"Unable to retrieve logs for {service_name}"}
 
     def start_load_test(self, users: int = 10, spawn_rate: int = 2, duration: int = 1800) -> Dict[str, Any]:
         """

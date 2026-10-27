@@ -71,18 +71,18 @@ class AgentClient:
 
         except requests.ConnectionError as e:
             elapsed = time.time() - start_time
-            logger.error(f"[AGENT-CLIENT] CONNECTION ERROR - elapsed={elapsed:.2f}s, model={model}, url={url}, error={str(e)}")
-            return {"error": f"Connection failed: Unable to reach AI Agent service ({str(e)})"}
+            logger.error(f"[AGENT-CLIENT] CONNECTION ERROR - elapsed={elapsed:.2f}s, model={model}, url={url}, error={e}", exc_info=True)
+            return {"error": "Connection failed: Unable to reach AI Agent service"}
 
         except requests.HTTPError as e:
             elapsed = time.time() - start_time
-            logger.error(f"[AGENT-CLIENT] HTTP ERROR - status={response.status_code}, elapsed={elapsed:.2f}s, model={model}, url={url}")
-            return {"error": f"HTTP error {response.status_code}: {str(e)}"}
+            logger.error(f"[AGENT-CLIENT] HTTP ERROR - status={response.status_code}, elapsed={elapsed:.2f}s, model={model}, url={url}, error={e}", exc_info=True)
+            return {"error": f"HTTP error {response.status_code} from AI Agent service"}
 
         except Exception as e:
             elapsed = time.time() - start_time
-            logger.error(f"[AGENT-CLIENT] UNEXPECTED ERROR - elapsed={elapsed:.2f}s, model={model}, url={url}, error={str(e)}", exc_info=True)
-            return {"error": f"Unexpected error: {str(e)}"}
+            logger.error(f"[AGENT-CLIENT] UNEXPECTED ERROR - elapsed={elapsed:.2f}s, model={model}, url={url}, error={e}", exc_info=True)
+            return {"error": "Unexpected error while contacting AI Agent service"}
 
     def send_chat(self, message: str, model: str = "a") -> Dict[str, Any]:
         """
@@ -106,7 +106,8 @@ class AgentClient:
         except requests.Timeout:
             return {"error": "Chat request timed out"}
         except Exception as e:
-            return {"error": str(e)}
+            logger.error(f"[AGENT-CLIENT] Chat request failed: {e}", exc_info=True)
+            return {"error": "Chat request failed"}
 
     def get_status(self) -> Dict[str, Any]:
         """Get agent status and metrics."""
