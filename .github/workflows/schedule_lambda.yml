@@ -6,6 +6,9 @@ on:
     # Run every 20 minutes
     - cron: "*/10 * * * *"
 
+permissions:
+  contents: read
+
 jobs:
   invoke-lambdas:
     runs-on: ubuntu-latest
