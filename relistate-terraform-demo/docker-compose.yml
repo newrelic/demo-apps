@@ -1,4 +1,4 @@
-name: relistate
+name: relistate-terraform-demo
 
 services:
   relistate-web:
@@ -11,7 +11,7 @@ services:
     environment:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
       NEW_RELIC_MONITOR_MODE: ${NEW_RELIC_MONITOR_MODE:-false}
-      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME:-ReliState-Demo}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME:-ReliState-Terraform-Demo}
       NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: ${NEW_RELIC_DISTRIBUTED_TRACING_ENABLED:-true}
       NEW_RELIC_LOG: ${NEW_RELIC_LOG:-stdout}
       NEW_RELIC_LOG_LEVEL: ${NEW_RELIC_LOG_LEVEL:-info}

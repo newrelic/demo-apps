@@ -6,7 +6,7 @@ A small Flask app that exercises New Relic APM with feature flags, simulated err
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  Docker Compose: relistate                               │
+│  Docker Compose: relistate-terraform-demo                │
 │                                                          │
 │  ┌──────────────────┐   HTTP    ┌────────────────────┐   │
 │  │  relistate-web   │ ◄──────── │ relistate-loadgen  │   │
@@ -97,7 +97,7 @@ The `relistate-loadgen` service sends requests in this proportion:
 |----------|----------|---------|-------------|
 | `NEW_RELIC_LICENSE_KEY` | No | empty | New Relic ingest license key |
 | `NEW_RELIC_MONITOR_MODE` | No | `false` | Set `true` to report data once a license key is present |
-| `NEW_RELIC_APP_NAME` | No | `ReliState-Demo` | APM application name |
+| `NEW_RELIC_APP_NAME` | No | `ReliState-Terraform-Demo` | APM application name |
 | `NEW_RELIC_DISTRIBUTED_TRACING_ENABLED` | No | `true` | Enables distributed tracing |
 | `NEW_RELIC_LOG` | No | `stdout` | Agent log destination |
 | `NEW_RELIC_LOG_LEVEL` | No | `info` | Agent log level |
