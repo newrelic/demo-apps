@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ReliState Developer Playground</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #101827; color: #eef4ff; }
+    main { max-width: 820px; margin: 36px auto; padding: 0 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    h1 { margin-bottom: 6px; }
+    .subtitle { color: #a6b8d4; }
+    .card { background: #1b2940; border: 1px solid #314561; border-radius: 14px;
+            padding: 20px; margin: 20px 0; }
+    button, select { font: inherit; padding: 10px 12px; border-radius: 8px; margin: 4px;
+                     border: 1px solid #526987; }
+    button { background: #77c2ff; color: #112039; cursor: pointer; }
+    button:hover { background: #a3d7ff; }
+    select { background: #f4f7ff; color: #172238; }
+    .danger { background: #ffb8b8; }
+    output { display: block; padding: 12px; min-height: 20px; background: #101827;
+             border-radius: 8px; margin-top: 12px; overflow-wrap: anywhere; }
+    .pill { background: #174a37; color: #9bf0be; padding: 8px 12px; border-radius: 99px; }
+    .hint { color: #a6b8d4; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>🚀 ReliState Developer Playground</h1>
+      <p class="subtitle">A tiny application with rich telemetry.</p>
+    </div>
+    <span class="pill">Demo app</span>
+  </header>
+
+  <section class="card">
+    <h2>Incident Simulator</h2>
+    <p>Generate predictable failures and slow transactions for New Relic.</p>
+    <button class="danger" onclick="triggerError()">Trigger Error</button>
+    <button onclick="triggerSlow()">Simulate Slow Request</button>
+    <button onclick="checkHealth()">Check Health</button>
+    <output id="incidentResult" aria-live="polite">Ready.</output>
+  </section>
+
+  <section class="card">
+    <h2>Feature Flag Manager</h2>
+    <p>Evaluate a flag or update its value.</p>
+    <button onclick="checkFlag('dark_mode_beta')">Check Dark Mode</button>
+    <button onclick="checkFlag('express_checkout')">Check Express Checkout</button>
+    <output id="flagResult" aria-live="polite">Choose a flag to evaluate.</output>
+    <p>
+      <label for="flagName">Feature:</label>
+      <select id="flagName">
+        <option value="dark_mode_beta">Dark Mode Beta</option>
+        <option value="express_checkout">Express Checkout</option>
+      </select>
+      <label for="flagEnabled">Set to:</label>
+      <select id="flagEnabled">
+        <option value="true">ON</option>
+        <option value="false">OFF</option>
+      </select>
+      <button onclick="updateFlag()">Update Flag</button>
+    </p>
+    <p class="hint">Updates are shared between the two Docker web workers.</p>
+  </section>
+
+  <section class="card">
+    <h2>Browser Monitoring Demo</h2>
+    <p>Trigger a client-side JavaScript error for the browser lesson.</p>
+    <button class="danger" onclick="triggerBrowserError()">Trigger JS Error</button>
+    <p class="hint">A deliberate error will appear in Chrome DevTools.</p>
+  </section>
+</main>
+
+<script>
+  async function showResponse(path, resultId) {
+    const result = document.getElementById(resultId);
+    result.textContent = 'Waiting for response...';
+    try {
+      const response = await fetch(path);
+      const data = await response.json();
+      result.textContent = 'HTTP ' + response.status + ': ' +
+        (data.message || data.status || data.error) +
+        (data.delay_seconds !== undefined ? ' (' + data.delay_seconds + ' seconds)' : '');
+    } catch (error) {
+      result.textContent = 'Request failed: ' + error.message;
+    }
+  }
+
+  function triggerError() { return showResponse('/simulate/error', 'incidentResult'); }
+  function triggerSlow() { return showResponse('/simulate/slow', 'incidentResult'); }
+  function checkHealth() { return showResponse('/healthz', 'incidentResult'); }
+
+  async function checkFlag(flagName) {
+    const result = document.getElementById('flagResult');
+    try {
+      const response = await fetch('/api/v1/flags/evaluate?flag=' + encodeURIComponent(flagName));
+      const data = await response.json();
+      result.textContent = response.ok
+        ? data.flag + ': ' + (data.enabled ? 'ON' : 'OFF')
+        : 'HTTP ' + response.status + ': ' + data.error;
+    } catch (error) {
+      result.textContent = 'Request failed: ' + error.message;
+    }
+  }
+
+  async function updateFlag() {
+    const flag = document.getElementById('flagName').value;
+    const enabled = document.getElementById('flagEnabled').value === 'true';
+    const result = document.getElementById('flagResult');
+    try {
+      const response = await fetch('/api/v1/flags/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flag: flag, enabled: enabled })
+      });
+      const data = await response.json();
+      result.textContent = response.ok
+        ? data.flag + ' updated: ' + (data.enabled ? 'ON' : 'OFF')
+        : 'HTTP ' + response.status + ': ' + data.error;
+    } catch (error) {
+      result.textContent = 'Request failed: ' + error.message;
+    }
+  }
+
+  function triggerBrowserError() {
+    throw new Error('ReliState demo: intentional browser JavaScript error');
+  }
+</script>
+</body>
+</html>
