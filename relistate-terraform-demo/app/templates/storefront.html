@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ReliState Supply | Little things. Big energy.</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="announcement" id="shippingBanner">✦ Free shipping on all demo orders — no real purchases ✦</div>
+  <header class="site-header"><a class="wordmark" href="/" aria-label="ReliState Supply home"><span class="brand-mark">✳</span> ReliState<span class="wordmark-light">Supply</span></a>
+    <nav class="main-nav" aria-label="Main navigation"><a href="#shop">Shop</a><a href="#about">Our story</a><a class="nav-subtle" href="/console">Developer console ↗</a></nav>
+    <button class="cart-button" id="cartButton" type="button" aria-label="Open shopping cart">Bag <span id="cartCount">0</span></button>
+  </header>
+  <main>
+    <section class="hero"><div class="hero-copy"><span class="eyebrow">A BETTER KIND OF EVERYDAY</span><h1>Good things,<br><em>great energy.</em></h1>
+      <p>Modern essentials for bright ideas and busy lives. A fictional store built for a very real observability demo.</p>
+      <a class="button dark" href="#shop">Explore the collection <span aria-hidden="true">↗</span></a>
+      <div class="hero-proof"><span class="proof-icon">✦</span><span>Designed to delight. Built to demonstrate.</span></div>
+    </div>
+    <div class="hero-art" aria-hidden="true"><span class="orb orb-one"></span><span class="orb orb-two"></span><div class="hero-disc"><span>RS</span><small>MAKE IT<br>COUNT</small></div><span class="hero-spark spark-one">✳</span><span class="hero-spark spark-two">✦</span><span class="hero-sticker">NEW<br>SEASON<br>ENERGY↗</span></div></section>
+    <section class="benefits" id="about"><span>✳ Thoughtfully picked essentials</span><span>⚡ Made for curious minds</span><span>♡ Demo store, zero real charges</span></section>
+    <section class="shop-section" id="shop"><div class="section-title"><div><span class="eyebrow">THE EDIT</span><h2>Find your next favorite.</h2></div><p>A little bit of everything.<br>A lot to love.</p></div>
+      <div class="filter-row" id="filters"><button class="filter is-active" data-filter="All">All items</button><button class="filter" data-filter="Desk">Desk</button><button class="filter" data-filter="Audio">Audio</button><button class="filter" data-filter="Lifestyle">Lifestyle</button><button class="filter" data-filter="Wellness">Wellness</button></div>
+      <div class="product-grid" id="productGrid"><p class="loading">Loading our collection…</p></div>
+    </section>
+    <section class="mid-banner"><div><span class="eyebrow">MADE TO EXPLORE</span><h2>Real clicks.<br><em>Meaningful signals.</em></h2></div><p>Behind this storefront is a Flask app that generates transactions, latency, and telemetry in New Relic. Every demo order is fictional.</p><a href="/console">See developer controls ↗</a></section>
+  </main>
+  <footer><strong>✳ ReliState Supply</strong><span>Fictional products. No payments collected.</span><span>Built for Observability as Code.</span></footer>
+  <div class="overlay" id="overlay" hidden></div>
+  <aside class="cart-drawer" id="cartDrawer" aria-label="Shopping bag" aria-hidden="true"><div class="cart-head"><div><span class="eyebrow">YOUR PICKS</span><h2>Shopping bag</h2></div><button class="icon-button" id="closeCart" aria-label="Close cart">×</button></div><div class="cart-items" id="cartItems"></div><div class="cart-bottom"><div class="subtotal"><span>Subtotal</span><strong id="subtotal">$0.00</strong></div><p class="cart-notice">Demo checkout only. No payment details requested or charged.</p><button class="button dark checkout-button" id="checkoutButton">Place demo order ↗</button><p class="cart-message" id="cartMessage" role="status"></p></div></aside>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="{{ url_for('static', filename='storefront.js') }}" defer></script>
+</body>
+</html>

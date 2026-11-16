@@ -11,11 +11,23 @@ while True:
     try:
         choice = random.random()
         if choice < 0.75:
-            flag = random.choice(["dark_mode_beta", "express_checkout"])
+            flag = random.choice(["dark_mode_beta", "express_checkout", "free_shipping_banner"])
             response = requests.get(BASE_URL + "/api/v1/flags/evaluate",
                                     params={"flag": flag}, timeout=10)
         elif choice < 0.90:
-            response = requests.get(BASE_URL + "/console", timeout=10)
+            if random.random() < 0.5:
+                # Storefront visit: browse the catalog, sometimes place a fictional order.
+                response = requests.get(BASE_URL + "/", timeout=10)
+                requests.get(BASE_URL + "/api/v1/products", timeout=10)
+                if random.random() < 0.25:
+                    requests.post(
+                        BASE_URL + "/api/v1/checkout",
+                        json={"items": [{"id": random.choice(["nova", "arc", "orbit"]),
+                                         "quantity": random.randint(1, 2)}]},
+                        timeout=10,
+                    )
+            else:
+                response = requests.get(BASE_URL + "/console", timeout=10)
         elif choice < 0.98:
             response = requests.post(
                 BASE_URL + "/api/v1/flags/rules",

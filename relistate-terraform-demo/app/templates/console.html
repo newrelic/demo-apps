@@ -32,6 +32,7 @@
       <p class="subtitle">A tiny application with rich telemetry.</p>
     </div>
     <span class="pill">Demo app</span>
+    <a class="pill" href="/">← Storefront</a>
   </header>
 
   <section class="card">
@@ -48,12 +49,14 @@
     <p>Evaluate a flag or update its value.</p>
     <button onclick="checkFlag('dark_mode_beta')">Check Dark Mode</button>
     <button onclick="checkFlag('express_checkout')">Check Express Checkout</button>
+    <button onclick="checkFlag('free_shipping_banner')">Check Free Shipping Banner</button>
     <output id="flagResult" aria-live="polite">Choose a flag to evaluate.</output>
     <p>
       <label for="flagName">Feature:</label>
       <select id="flagName">
         <option value="dark_mode_beta">Dark Mode Beta</option>
         <option value="express_checkout">Express Checkout</option>
+        <option value="free_shipping_banner">Free Shipping Banner</option>
       </select>
       <label for="flagEnabled">Set to:</label>
       <select id="flagEnabled">
