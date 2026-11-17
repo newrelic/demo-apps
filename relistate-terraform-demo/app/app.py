@@ -230,6 +230,27 @@ def demo_stats():
     return jsonify(demo_orders=order_count, total_cents=total_cents), 200
 
 
+class SimulatedServerFailure(Exception):
+    """Demo-only exception. Raised and caught inside /simulate/error so APM records a real TransactionError."""
+
+
+def report_simulated_failure(status_code):
+    """Attach the caught demo exception (with traceback) to the current New Relic transaction.
+
+    The Python agent only records errors for exceptions that escape Flask or are passed to notice_error();
+    returning a 500/503 response alone does not create a TransactionError event.
+    """
+    try:
+        raise SimulatedServerFailure("Simulated server failure (demo only)")
+    except SimulatedServerFailure:
+        if nr_agent is not None:
+            nr_agent.notice_error(
+                error=sys.exc_info(),
+                attributes={"demo.scenario": "simulate_error", "demo.http_status_code": status_code},
+                status_code=status_code,
+            )
+
+
 @app.route("/simulate/error", methods=["GET", "POST"])
 def simulate_error():
     try:
@@ -244,6 +265,7 @@ def simulate_error():
 
     code = random.choice([500, 503])
     log_event("simulated_failure", status_code=code)
+    report_simulated_failure(code)
     return jsonify({"status": "error", "message": "Simulated server failure"}), code
 
 
