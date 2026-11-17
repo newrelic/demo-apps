@@ -1,0 +1,49 @@
+name: relistate-terraform-demo
+
+services:
+  relistate-web:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: relistate-web
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_MONITOR_MODE: ${NEW_RELIC_MONITOR_MODE:-false}
+      NEW_RELIC_APP_NAME: ${NEW_RELIC_APP_NAME:-ReliState-Terraform-Demo}
+      NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: ${NEW_RELIC_DISTRIBUTED_TRACING_ENABLED:-true}
+      NEW_RELIC_LOG: ${NEW_RELIC_LOG:-stdout}
+      NEW_RELIC_LOG_LEVEL: ${NEW_RELIC_LOG_LEVEL:-info}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SERVICE_TIER: ${SERVICE_TIER:-tier-1}
+      OWNER_TEAM: ${OWNER_TEAM:-platform}
+      DEMO_API_SECRET: ${DEMO_API_SECRET:-local-demo-secret}
+      DATABASE_PATH: /data/flags.sqlite3
+    volumes:
+      - relistate-data:/data
+    networks:
+      - relistate
+    restart: unless-stopped
+
+  relistate-loadgen:
+    build:
+      context: ./loadgen
+      dockerfile: Dockerfile
+    container_name: relistate-loadgen
+    depends_on:
+      relistate-web:
+        condition: service_healthy
+    environment:
+      APP_URL: http://relistate-web:8000
+      TRAFFIC_INTERVAL_SECONDS: ${TRAFFIC_INTERVAL_SECONDS:-5}
+    networks:
+      - relistate
+    restart: unless-stopped
+
+networks:
+  relistate:
+    driver: bridge
+
+volumes:
+  relistate-data:
